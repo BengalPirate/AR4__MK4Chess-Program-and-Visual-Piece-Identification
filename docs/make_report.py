@@ -69,7 +69,7 @@ def contributions():
 
 def main():
     web = md_section("results/accuracy_webcam.md", "All held-out webcam boards")
-    mid = md_section("results/accuracy_webcam.md", "Mid-game positions")
+    mid = md_section("results/accuracy_webcam.md", "Other positions")
     start = md_section("results/accuracy_webcam.md", "Start positions")
     photo = md_section("results/accuracy_cnn.md", "Held-out phone photos")
     screens = sorted(glob.glob(os.path.join(ROOT, "results", "screens", "*.png")))
@@ -93,7 +93,8 @@ def main():
             "en passant rights, and a change on the board is accepted only when one legal move "
             "explains it clearly; otherwise the program pauses for the operator. A selected "
             "legal move is turned into pick-and-place operations and checked with Annin's "
-            "kinematics before the arm moves. On 14 webcam boards never used for training the "
+            "kinematics before the arm moves. On 38 webcam frames never used for training (20 start "
+            "positions, 18 frames of 8 other positions) the "
             f"labels were {web.get('exact label (empty / type+colour)', '?')} exact "
             f"(colour {web.get('colour, on occupied squares detected as occupied', '?')}); "
             "in 88 move-inference tests no wrong move was accepted; and the real arm moved all "
@@ -165,26 +166,30 @@ def main():
                  ["Phone photos, test split", "483", photo.get("exact label (empty / type+colour)", "?"),
                   photo.get("occupancy", "?"), photo.get("colour, on occupied squares detected as occupied", "?"),
                   photo.get("piece type, on occupied squares", "?")],
-                 ["Webcam start positions (11 boards)", "704",
+                 ["Webcam start positions (20 frames)", "1280",
                   start.get("exact label (empty / type+colour)", "?"), start.get("occupancy", "?"),
                   start.get("colour, on occupied squares detected as occupied", "?"),
                   start.get("piece type, on occupied squares", "?")],
-                 ["Webcam mid-game positions (3 boards)", "192",
+                 ["Webcam other positions (18 frames, 8 positions)", "1152",
                   mid.get("exact label (empty / type+colour)", "?"), mid.get("occupancy", "?"),
                   mid.get("colour, on occupied squares detected as occupied", "?"),
                   mid.get("piece type, on occupied squares", "?")],
-                 ["All webcam boards (14)", "896", web.get("exact label (empty / type+colour)", "?"),
+                 ["All webcam frames (38)", "2432", web.get("exact label (empty / type+colour)", "?"),
                   web.get("occupancy", "?"), web.get("colour, on occupied squares detected as occupied", "?"),
                   web.get("piece type, on occupied squares", "?")]],
                 [W * 0.34, W * 0.1, W * 0.14, W * 0.14, W * 0.14, W * 0.14]),
           P("Colour and type are measured on occupied squares that were detected as occupied. "
-            "4 of the 11 start-position boards come from the first, lower camera angle (89–94 %); "
-            "at the final angle start positions score 98.4–100 %.", SMALL),
+            "4 of the 20 start-position frames come from the first, lower camera angle (89–94 %); "
+            "at the final angle start positions score 98.4–100 %. The other positions include three "
+            "mid-game positions (one with both sides castled), colours swapped, two scrambled "
+            "arrangements and a sparse endgame.", SMALL),
           img("docs/recognition_examples.png", W),
-          P("<b>Errors and ambiguous cases.</b> All 9 errors on the mid-game boards are pieces "
+          P("<b>Errors and ambiguous cases.</b> All 9 errors on the three mid-game boards are pieces "
             "partly hidden behind a taller piece in the camera's line of sight (h2 pawn behind "
             "the g1 king, f8 rook behind the g8 king, e8 king and e7 queen in line, c7 / f7 "
             "pawns behind back-rank pieces); 7 of the 9 were below the confidence threshold. "
+            "On the five other arrangements every error (1–2 squares per frame) was below the "
+            "threshold. "
             "Other ambiguous cases: queen vs king and bishop vs pawn when only the top of the "
             "piece is visible, and black pieces on dark squares. At the first camera angle the "
             "e2 pawn was hidden behind the e1 king; every move test there paused (safe but "

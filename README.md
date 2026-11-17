@@ -15,13 +15,14 @@ Report: [`docs/Team2_Checkpoint2_Report.pdf`](docs/Team2_Checkpoint2_Report.pdf)
 | Test | Result |
 |---|---|
 | Phone photos, held-out test split (483 squares) | **97.1 %** exact label (empty / type + colour) |
-| Webcam boards never trained on (14 boards: 11 start positions, 3 mid-game) | **96.0 %** exact, colour 100 % on detected pieces |
-| Mid-game positions (incl. both sides castled) | 95.3 % each; every error is a piece hidden behind a taller one |
+| Webcam frames never trained on (38: 20 start positions, 18 frames of 8 other positions) | **98.1 %** exact, colour 100 % on detected pieces |
+| Other positions (mid-games incl. both sides castled, colours swapped, scrambled, endgame) | 98.4 % exact; mid-game errors are pieces hidden behind taller ones |
 | Move inference on webcam boards (88 simulated moves) | 56 correct and accepted, 32 paused for the operator, **0 wrong moves accepted** |
 | Unit tests (`pytest tests`) | 25 / 25 pass: legal / illegal moves, castling rights, en passant, promotion, undo, move inference, special-move plans, J5 window, interlock |
 | Real arm, 10 % speed | all 32 pieces moved two ranks forward (pawns, back ranks, tilted grips on rank 8) |
 
-Details: `results/accuracy_cnn.md` (photos + webcam), `results/test_log.md`
+Details: `results/accuracy_cnn.md` (photos), `results/accuracy_webcam.md` (webcam,
+`python tests/webcam_report.py`), `results/test_log.md`
 (arm and vision tests with the problems found and fixed).
 
 ## How it works

@@ -68,9 +68,8 @@ def recognition_examples():
     for stamp, img, geo, labels in load_samples("data_webcam_test"):
         start = "".join(labels[:16]) == "RNBQKBNRPPPPPPPP"
         boards.append((stamp, img, geo, labels, start))
-    mids = [b for b in boards if not b[4]][-3:]
-    starts = [b for b in boards if b[4]][-1:]
-    sel = starts + mids
+    show = ("20261116-141910-144", "20261116-231455-889", "20261116-233436-740", "20261116-233907-252")
+    sel = [b for k in show for b in boards if b[0] == k]
     fig, axes = plt.subplots(2, 2, figsize=(11, 6.6))
     for ax, (stamp, img, geo, labels, start) in zip(axes.flat, sel):
         lp = np.asarray(clf.logp([geo.crops(img)]))
@@ -92,7 +91,7 @@ def recognition_examples():
         x0, y0 = np.min(geo.project(np.array([[-1, -1, 0], [9, 9, 0]], float)), axis=0)
         crop = vis[max(0, int(y0) - 120):, :]
         ax.imshow(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-        ax.set_title(f"{'start position' if start else 'mid-game'}  {stamp}:  {ok}/64 exact", fontsize=9)
+        ax.set_title(f"{'start position' if start else 'other position'}  {stamp}:  {ok}/64 exact", fontsize=9)
         ax.axis("off")
     fig.suptitle("Recognition on held-out webcam boards (label = prediction; green correct, "
                  "red wrong, orange low confidence; '_' = predicted empty)", fontsize=9.5)

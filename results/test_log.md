@@ -9,7 +9,9 @@ All arm tests at 10 % speed with an operator at the E-stop. Dates 2026-11-16.
 | Phone-photo test split | 483 squares from photo groups never trained on | 97.1 % exact |
 | Webcam, start positions | 11 boards (4 from the first, lower camera angle) | 96.2 % exact; 98.7 % at the final camera angle |
 | Webcam, changed positions | 3 mid-game boards: after 1.d4 e5 2.Bf4 Nc6 3.Nf3 Nf6; developed pieces with captures; both sides castled | 95.3 % each |
-| Colour | all 442 occupied squares on the 14 boards | 100 % on squares detected as occupied |
+| Webcam, other arrangements | 5 positions set up from chess_demo's training setups (colours swapped, two scrambled, sparse endgame), 3 frames each, saved after the model was trained | 96.9–100 % per frame; every error flagged uncertain |
+| All held-out webcam frames | 38 frames (`python tests/webcam_report.py`) | 98.1 % exact, occupancy 99.5 % |
+| Colour | all 1,120 occupied squares on the 38 frames | 100 % on squares detected as occupied |
 | Move inference | 88 simulated moves (knight moves out and back on the start boards) | 56 correct and accepted, 32 paused, 0 wrong accepted |
 
 Error analysis (mid-game boards, 9 errors): all are pieces partly or fully
