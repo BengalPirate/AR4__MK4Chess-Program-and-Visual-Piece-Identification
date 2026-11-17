@@ -200,9 +200,11 @@ def main():
 
     s += [PageBreak(), P("4. Board-state integration and robot interface", H2)]
     if screens:
-        s += [P("Screenshots of chess_demo.py: live recognition (labels on every square), the "
-                "recognised position reconciled with the game, and an engine-selected legal "
-                "move with its source and destination squares and the robot plan.")]
+        s += [P("Screenshots of chess_demo.py. Left: the live camera view with the calibrated "
+                "grid (recognised labels drawn on the squares in live mode, the selected move's "
+                "source and destination highlighted). Right: the game state kept by the chess "
+                "program - position, side to move, castling and en passant rights, captured "
+                "tray, engine, and whether the last scan verified the physical board.")]
         for path in screens[-3:]:
             s += [img(path, W, max_h=3.4 * inch), Spacer(1, 4)]
     else:
