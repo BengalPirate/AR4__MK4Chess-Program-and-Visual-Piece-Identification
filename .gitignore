@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.mp4
+*.mov
+*.log
+*.bak_*
+# decoded phone photos (258 MB) - regenerate: python photo_dataset.py decode
+data_photos/img/
+# superseded models and the torchvision weight cache
+models/torch/
+models/piece_cnn_cam1.pt
+models/piece_cnn_photos_only.pt
+# frames not used for training or testing
+data_pending/
+data_rejected/
+config/old/

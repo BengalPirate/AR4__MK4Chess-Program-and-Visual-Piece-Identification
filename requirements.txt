@@ -1,0 +1,17 @@
+# Python 3.12 (tested on Ubuntu 24.04 arm64 in Parallels). Versions are the tested ones.
+chess==1.11.2               # python-chess: board, legal moves, UCI engine interface
+numpy==2.5.4
+opencv-python>=4.8          # tested with 5.0.0
+torch==2.15.0               # CPU build is enough
+torchvision==0.29.2
+scikit-learn==1.9.1         # feature + logistic-regression baseline (pieces.py fallback)
+joblib==1.6.0
+scipy==1.18.1               # tilted-gripper inverse kinematics (kin.py)
+pyserial==3.5               # AR4 Teensy and gripper Nano
+pillow==12.3.0
+pillow-heif                 # photo_dataset.py: iPhone HEIC photos
+transformers==5.23.0        # photo_dataset.py: OWL-ViT piece boxes (dataset building only)
+matplotlib==3.11.2          # figures
+reportlab==5.1.0            # docs/make_report.py
+# Also needed: Annin's robot_kinematics module from the AR4 HMI 6.7 source
+# (ARrobots/robot_kinematics), see README "Setup". Optional: stockfish binary on PATH.
