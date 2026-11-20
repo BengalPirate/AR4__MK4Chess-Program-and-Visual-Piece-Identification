@@ -16,3 +16,10 @@ models/piece_cnn_photos_only.pt
 data_pending/
 data_rejected/
 config/old/
+# offset photos discarded for wrong labels
+data_offsets_rejected/
+# raw rod-calibration frames (the overlay pictures and results/rod_calib.csv are kept)
+results/rod_calib_*_raw_*.jpg
+# identical copy of models/piece_cnn.pt / superseded front-camera-only model
+models/piece_cnn_2cam.pt
+models/piece_cnn_front_only_20261117.pt

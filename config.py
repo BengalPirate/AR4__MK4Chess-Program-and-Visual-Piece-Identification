@@ -16,7 +16,20 @@ LOCK_FILE = os.environ.get("AR4_BOARD_LOCK", "/tmp/ar4_board.lock")
 
 # ---------------------------------------------------------------- camera
 CAMERA_NAME = "Logitech Webcam C930e"
+# Board cameras. "near" = the board side closest to the camera (orientation for
+# auto calibration): rank1 / rank8 / fileA / fileH. "file" = its calibration.
+# Scans classify every square in every attached view and fuse the results.
+CAMERAS = {
+    "front": {"name": "Logitech Webcam C930e", "near": "rank1",
+              "file": os.path.join(CONFIG_DIR, "board_image.json")},
+    "side": {"name": "C920", "near": "fileA",
+             "file": os.path.join(CONFIG_DIR, "board_image_side.json")},
+}
+# Weight of each view when fusing (geometric mean of the probabilities)
+VIEW_WEIGHT = {"front": 1.0, "side": 1.0}
+SQUARE_MM = 47.0                    # board square size (folding board, 47 mm)
 FRAME_SIZE = (1280, 720)
+CAMERA_FPS = 15                     # two 720p cameras only fit the VM's USB link together at <= 15 fps
 MARKER_IDS = (4, 5, 6, 7)           # ArUco DICT_4X4_50 markers on the mat (bump check)
 CAMERA_MOVED_PX = 8.0               # ArUco marker shift (if markers are visible) that invalidates calibration
 MIN_TILE_ALIGNMENT = 0.45           # tile-edge correlation with the empty-board reference (tune on the real board)
@@ -50,23 +63,78 @@ TOOL_LENGTH_MM = 64.0               # J6 flange -> closed jaw tips: user measure
 MAX_TILT_DEG = 60.0                 # squares unreachable straight down (b8-g8: J3 would pass +52) are
                                     # approached with the gripper tilted in the arm's vertical plane
 RANK8_TILT_DEG = 30.0              # rank 8 is always worked tilted back this much with J5 (tips toward the robot); needs >= 25 with the 64 mm tool
+# A piece picked tilted on rank 8 is carried at that tilt; it is set down on a free
+# square midway and picked up again straight down before going to ranks 1-2, or
+# wherever the tilted pose would bring J5 within this margin of its window.
+REGRIP_RANKS = (1, 2)
+TILT_J5_MARGIN_DEG = 10.0
+# Missed grip (cameras still see the piece on its square after the lift): retry
+# shifted this far along the a-h direction, first in GRIP_RETRY_FIRST (+1 = toward
+# h, -1 = toward a; the camera's hint wins when it has one), then the other way,
+# at most GRIP_RETRIES times. 2026-11-17: tilted miss at h5 had the jaws on the a side.
+# Before each pick the cameras read how far off centre the piece stands
+# (offset_model.py, trained on data_offsets/). Operator's rule: more than 10 mm off in
+# x or y -> the pick is shifted 15 mm that way (offset_model.SHIFT_MM). False = off.
+OFFSET_CORRECTION = True
+# After every set-down on a square: step aside, read the piece's offset with the
+# cameras (offset_model); if it is more than PLACE_TOL_MM off in x or y, pick it up
+# where it really stands and set it down shifted the other way by that much, up to
+# PLACE_FIX_TRIES times (operator's request 2026-11-19).
+PLACE_CHECK = True
+PLACE_TOL_MM = 4.0
+PLACE_FIX_TRIES = 2
+PLACE_ASIDE_SQ = 1.5          # step this many squares aside (toward the robot; ranks 7-8: toward rank 1) to look
+GRIP_RETRY_MM = 5.0
+GRIP_RETRIES = 2
+GRIP_RETRY_FIRST = +1
 TRAVEL_CLEARANCE = 15               # gap kept above the tallest piece during transit
 APPROACH_Z = 40                     # above the piece top before the slow descent
-VERTICAL_STEP_MM = 15               # waypoint spacing on vertical approach/retreat
-PATH_TOL_MM = 3.0                   # max deviation of a joint move from the straight line
+VERTICAL_STEP_MM = 15               # (no longer used for splitting: _vertical is one move, split by PATH_TOL_MM)
+# J1 has ~2 deg of slack (2026-11-19, rod + cameras: e5 reached from a5 read 15.7 mm
+# toward a, from h5 1.6 mm). Every final approach therefore ends with the base turning
+# toward the a-file: first to a point this far toward h at travel height, then onto
+# the target, so the slack is always taken up the same way. 0 = off.
+BACKLASH_APPROACH_MM = 20.0
+# Measured aim error per square (rod_calib.py: blue rod in the jaws, both cameras,
+# backlash approach on) -> config/aim_correction.json; planner subtracts it from every
+# square's aim. Rank 8: a-h part only. False = off (back to the taught corners alone).
+AIM_CORRECTION = True
+# Operator's call 2026-11-19 after a real h8 pick (gripper too far toward h with the full
+# map): use HALF the measured correction; then 1/3 after the next pick ("a bit too close to missing").
+AIM_CORRECTION_SCALE = 1.0 / 3.0
+AIM_CORRECTION_FILE = os.path.join(CONFIG_DIR, "aim_correction.json")
+PATH_TOL_MM = 3.0
+MAX_JOINT_FLIP_DEG = 15.0           # a step turning a joint more than this ...
+MAX_DEG_PER_MM = 1.5                # ... and more than this per mm of tip travel is a configuration flip: refused                   # max deviation of a joint move from the straight line
 
 # Piece heights above the board (mm) and grasp height (fingertip height above the
 # board surface when gripping). MEASURE THESE on the real set before the final.
 PIECE_HEIGHT = {"P": 48, "N": 62, "B": 70, "R": 52, "Q": 84, "K": 95}
 # Measured on the real set 2026-11-16 (fingertip height above the board when gripping and releasing)
 GRASP_Z = {"P": 23.0, "N": 35.0, "R": 35.0, "B": 45.0, "Q": 57.0, "K": 68.0}   # P checked on the arm; others -5 mm after the first arm test
-PLACE_EXTRA_Z = 2.0                 # release this far above the grasp height
+PLACE_EXTRA_Z = 2.0
+# Promotion: a captured piece of the new kind in the tray is swapped in; otherwise
+# the pawn stays on the board as a stand-in (both players treat it as the new
+# piece; the software tracks it). A spare piece on a taught reserve spot could be
+# used instead by setting its FEN letter here (e.g. "q"); not used.
+RESERVE_PIECE = None                 # release this far above the grasp height
 
 
 # Small per-rank position corrections (mm, robot frame: +X away from the robot,
 # +Y to the robot's left), from watching the arm 2026-11-16.
 RANK_OFFSET_MM = {8: (5.0, 0.0), 7: (0.0, 2.0), 5: (2.0, 0.0)}
 SQUARE_OFFSET_MM = {s: (2.0, 0.0) for s in ("c8", "d8", "e8", "f8")}   # overrides the rank offset (middle of rank 8 needed less)
+# Used instead of the two above for rank 8 once a8/h8 are taught TILTED (robot_setup step 5)
+TILTED_SQUARE_OFFSET_MM = {}
+# Whole rank 8 (tilted picks/places), robot frame mm. 2026-11-19: with the re-taught
+# tilted a8/h8 the jaws gripped the rook at its far edge (away from the arm) on h8;
+# the operator's call: centre 10 mm toward the arm (-X), then 7 mm after the next test. Only rank 8 - the tilt
+# correction for ranks 3-7 still uses the taught a8/h8 points unchanged.
+RANK8_TILTED_OFFSET_MM = (-7.0, 0.0)
+# Tilted SET-DOWNS on ranks 3-7 (a piece carried from rank 8), board mm toward rank 8.
+# 2026-11-19: with the backlash approach h5 set-downs landed 5.7 / 7.8 / 8.9 mm toward
+# rank 1 -> operator approved +7.5.
+TILTED_PLACE_TOWARD_RANK8_MM = 7.5
 
 
 def travel_z(carrying=None):
@@ -79,7 +147,7 @@ def travel_z(carrying=None):
 
 # Gripper (servo 0 on the Nano): fitted travel 15 (closed) .. 45 (open)
 GRIP_OPEN_DEG = 45
-GRIP_YAW_PIECE = {p: 0.0 for p in "PNBRQK"}   # jaw rotation (deg): all straight - the gripper clears neighbours without the 45 slant
+GRIP_YAW_PIECE = {p: 0.0 for p in "PNBRQK"}   # extra jaw rotation (deg) on top of BoardRobot.jaw_yaw (jaws parallel to the square lines): all 0
 GRIP_OPEN_PIECE = {"P": 45, "N": 45, "B": 45, "R": 47, "Q": 47, "K": 47}   # open before descending; servo end stop ~52
 GRIP_SQUEEZE_DEG = {p: 0 for p in "PNBRQK"}   # extra closing after first contact (tightness) - tune with hover_test.py --grip
 GRIP_HOLD_DEG = {"P": 20, "N": 16, "B": 21, "R": 20, "Q": 20, "K": 18}   # position grip, close until this angle OR a stall (K: cross may be thin or wide -> 18 + stall stop)

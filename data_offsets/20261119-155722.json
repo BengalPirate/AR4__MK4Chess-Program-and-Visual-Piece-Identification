@@ -1,0 +1,67 @@
+{
+ "pieces": [
+  {
+   "square": "e8",
+   "piece": "k",
+   "colour": "black",
+   "direction": "a",
+   "mm": 10.0,
+   "dx_mm": -10.0,
+   "dy_mm": 0.0
+  },
+  {
+   "square": "c7",
+   "piece": "N",
+   "colour": "white",
+   "direction": "a",
+   "mm": 5.0,
+   "dx_mm": -5.0,
+   "dy_mm": 0.0
+  },
+  {
+   "square": "g6",
+   "piece": "P",
+   "colour": "white",
+   "direction": "h",
+   "mm": 10.0,
+   "dx_mm": 10.0,
+   "dy_mm": 0.0
+  },
+  {
+   "square": "b5",
+   "piece": "p",
+   "colour": "black",
+   "direction": "8",
+   "mm": 20.0,
+   "dx_mm": 0.0,
+   "dy_mm": 20.0
+  },
+  {
+   "square": "h3",
+   "piece": "Q",
+   "colour": "white",
+   "direction": "1",
+   "mm": 10.0,
+   "dx_mm": 0.0,
+   "dy_mm": -10.0
+  },
+  {
+   "square": "d1",
+   "piece": "r",
+   "colour": "black",
+   "direction": "h",
+   "mm": 15.0,
+   "dx_mm": 15.0,
+   "dy_mm": 0.0
+  }
+ ],
+ "cameras": [
+  "front",
+  "side"
+ ],
+ "note": "offset_capture.py | measurement 4: labels confirmed by the operator against both photos",
+ "calibration": {
+  "front": "/home/parallels/AR4/team2_chess/config/board_image.json",
+  "side": "/home/parallels/AR4/team2_chess/config/board_image_side.json"
+ }
+}

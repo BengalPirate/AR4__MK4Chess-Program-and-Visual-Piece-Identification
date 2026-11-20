@@ -167,33 +167,134 @@ def tilt_deg(js):
     return math.degrees(math.acos(max(-1.0, min(1.0, -v[2] / np.linalg.norm(v)))))
 
 
+# Horizontal unit vector a tilt leans along, or None = the arm's own vertical
+# plane (J5 alone tilts, J4 = 0; leans sideways at the rank-8 corners).
+# Operator's choice 2026-11-17 ("option A"): lean straight back along the robot's
+# X axis (no sideways lean); J4 rolls as needed and J6 turns so the jaws face the
+# board exactly as on every other square - a piece moved along / to / from rank 8
+# keeps its orientation. (False = "option C": J6 = J1 + yaw as straight down, the
+# jaws then turn ~25 deg at the rank-8 corners.)
+TILT_DIR = np.array([1.0, 0.0, 0.0])
+TILT_J6_COUNTER_TURN = True
+
+
+def set_tilt_direction(v):
+    global TILT_DIR
+    v = np.array([v[0], v[1], 0.0], float)
+    TILT_DIR = v / np.linalg.norm(v)
+
+
+def _axis_point(js, offset):
+    """World position of a point fixed in the tool frame (offset from the flange)."""
+    rk.set_robot_tool_frame(*offset, 0, 0, 0)
+    try:
+        return np.array(rk.forward_kinematics(list(js))[:3])
+    finally:
+        rk.set_robot_tool_frame(0, 0, 0, 0, 0, 0)
+
+
+def jaw_axis(js):
+    """Unit vector of the tool x axis (the jaws' opening direction is fixed in it)."""
+    v = _axis_point(js, (50.0, 0.0, 0.0)) - np.array(fk(js)[:3])
+    return v / np.linalg.norm(v)
+
+
+_JAW_REF = {}
+
+
+def _jaw_ref(yaw):
+    """Horizontal jaw direction of a straight-down pose with this yaw: the same
+    everywhere on the board (J6 = J1 + yaw), so tilted poses copy it."""
+    if yaw not in _JAW_REF:
+        for xyz in ((380.0, -40.0, 250.0), (400.0, 0.0, 250.0), (350.0, 50.0, 220.0)):
+            js = ik(xyz, (0.0, 180.0, 0.0), [0, 30, 0, 0, 60, yaw])
+            if js is not None:
+                js = list(js[:5]) + [_wrap(js[0] + yaw)]
+                v = jaw_axis(js)
+                v[2] = 0.0
+                _JAW_REF[yaw] = v / np.linalg.norm(v)
+                break
+        else:
+            raise RuntimeError("no straight-down reference pose for the jaw direction")
+    return _JAW_REF[yaw]
+
+
 def _ik_tilted(xyz, yaw, seed, min_tilt=0.0):
     """Fallback for ik_down: tips at (xyz - tool length straight down) with the tool
-    tilted by the smallest angle (5 deg steps up to config.MAX_TILT_DEG) in the
-    arm's vertical plane. J4 = 0 keeps the wrist in that plane; J6 = J1 + yaw as for
-    straight down. Solved numerically for J2, J3, J5."""
+    tilted by the smallest angle (5 deg steps from min_tilt up to MAX_TILT_DEG).
+
+    With TILT_DIR set (normal case): the lean is purely along that board direction
+    (back toward the robot along the files, no sideways component). All six joints
+    are solved numerically: tip position, tool axis direction, and J6 so the jaws
+    point the same way over the board as straight down (J4 rolls the wrist as needed).
+    Without it: the lean is in the arm's vertical plane (J4 = 0)."""
     from scipy.optimize import least_squares
     L = config.TOOL_LENGTH_MM
     t = np.array(xyz, float) - [0.0, 0.0, L]
     j1 = math.degrees(math.atan2(t[1], t[0]))
     ur = np.array([math.cos(math.radians(j1)), math.sin(math.radians(j1)), 0.0])
-    seeds = [list(seed[1:3]) + [seed[4]], [45.0, 50.0, 0.0], [70.0, -50.0, 60.0], [20.0, 40.0, 30.0]]
     best = None
     for th in np.arange(max(5.0, min_tilt), config.MAX_TILT_DEG + 0.1, 5.0):
         for sgn in (1.0, -1.0):
-            d = math.sin(math.radians(th)) * sgn * ur + [0.0, 0.0, -math.cos(math.radians(th))]
+            if TILT_DIR is None:
+                d = math.sin(math.radians(th)) * sgn * ur + [0.0, 0.0, -math.cos(math.radians(th))]
+                seeds = [list(seed[1:3]) + [seed[4]], [45.0, 50.0, 0.0], [70.0, -50.0, 60.0],
+                         [20.0, 40.0, 30.0]]
 
-            def res(q):
-                js = [j1, q[0], q[1], 0.0, q[2], 0.0]
-                p = tip(js)
-                f = np.array(fk(js)[:3])
-                return np.r_[p - t, (p - f) - L * d]
+                def res(q, d=d):
+                    js = [j1, q[0], q[1], 0.0, q[2], 0.0]
+                    p = tip(js)
+                    f = np.array(fk(js)[:3])
+                    return np.r_[p - t, (p - f) - L * d]
+
+                def full(q):
+                    return [float(j1), float(q[0]), float(q[1]), 0.0, float(q[2])]
+            elif not TILT_J6_COUNTER_TURN:
+                d = math.sin(math.radians(th)) * sgn * TILT_DIR + [0.0, 0.0, -math.cos(math.radians(th))]
+                seeds = [list(seed[:5]), [j1, 45.0, 50.0, 0.0, 0.0], [j1, 70.0, -50.0, 0.0, 60.0],
+                         [j1, 20.0, 40.0, 0.0, 30.0]]
+
+                def res(q, d=d):
+                    # the jaw tips sit on the tool axis, so J6 does not move them
+                    js = list(q) + [0.0]
+                    p = tip(js)
+                    f = np.array(fk(js)[:3])
+                    return np.r_[p - t, (p - f) - L * d]
+
+                def full(q):
+                    return [float(v) for v in q[:5]]
+            else:
+                d = math.sin(math.radians(th)) * sgn * TILT_DIR + [0.0, 0.0, -math.cos(math.radians(th))]
+                jr = _jaw_ref(yaw)
+                w = np.cross([0.0, 0.0, 1.0], jr)          # horizontal, across the jaws
+                seeds = [list(seed[:6]), [j1, 45.0, 50.0, 0.0, 0.0, j1 + yaw],
+                         [j1, 70.0, -50.0, 0.0, 60.0, j1 + yaw], [j1, 20.0, 40.0, 0.0, 30.0, j1 + yaw]]
+
+                def res(q, d=d, w=w, jr=jr):
+                    js = list(q)
+                    p = tip(js)
+                    f = np.array(fk(js)[:3])
+                    xa = jaw_axis(js)
+                    # jaws: x axis has no component across the reference direction,
+                    # and points along it (not against - the J6 + 180 twin is added below)
+                    return np.r_[p - t, (p - f) - L * d, 50.0 * np.dot(xa, w), 5.0 * (1.0 - np.dot(xa, jr))]
+
+                def full(q):
+                    return [float(v) for v in q[:5]]
             for s0 in seeds:
                 r = least_squares(res, s0, diff_step=1e-4, xtol=1e-9, ftol=1e-9)
-                if np.max(np.abs(r.fun)) > 0.3:
+                p_err = np.max(np.abs(r.fun[:6]))
+                if p_err > 0.3 or (TILT_DIR is not None and TILT_J6_COUNTER_TURN and abs(r.fun[6]) > 1.0):
                     continue
-                for j6 in (_wrap(j1 + yaw), _wrap(j1 + yaw + 180)):
-                    js = [float(j1), float(r.x[0]), float(r.x[1]), 0.0, float(r.x[2]), float(j6)]
+                if TILT_DIR is None:
+                    j6s = (_wrap(j1 + yaw), _wrap(j1 + yaw + 180))
+                elif not TILT_J6_COUNTER_TURN:
+                    j6s = (_wrap(float(r.x[0]) + yaw), _wrap(float(r.x[0]) + yaw + 180))
+                else:
+                    j6s = (_wrap(float(r.x[5])), _wrap(float(r.x[5]) + 180))
+                for j6 in j6s:
+                    js = full(r.x) + [j6]
+                    js = [_wrap(v) for v in js[:1]] + js[1:]
                     if within_limits(js):
                         dist = max(abs(a - b) for a, b in zip(js, seed))
                         if best is None or dist < best[0]:

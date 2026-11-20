@@ -97,3 +97,32 @@ def test_j5_outside_window_refused(tmp_path):
     arm = DryArm([0, 20, 10, 0, -101.0, 0])  # J5 folded past the measured safe range
     with pytest.raises(MotionError, match="J5"):
         Executor(arm, DryGripper(), br, BoardLock(str(tmp_path / "lock")))
+
+
+def test_missed_grip_is_retried_5mm_along_a_to_h(tmp_path):
+    import kin
+    br = make_robot(tmp_path)
+    g = Game()
+    seen = iter(["occupied", "empty"])       # first grip misses, the retry takes it
+    ex = Executor(DryArm(br.park["joints"] if br.park else [0, 30, 0, 0, 60, 0]), DryGripper(), br,
+                  BoardLock(str(tmp_path / "l")), log=lambda *a: None, pick_check=lambda sq: next(seen))
+    ops = [br.locate(o) for o in plan_move(g, g.parse_move("e2e4"))]
+    ex.run(ops, park=False)
+    assert [k for k, _ in ex.grip.log].count("hold") == 2          # missed once, retried once
+    # the arm visited the square centre and a point GRIP_RETRY_MM further along a->h
+    e2 = np.array(ops[0].xyz[:2])
+    along = br.file_step[:2] / np.linalg.norm(br.file_step[:2])
+    xy = [np.array(kin.vfk(js)[:2]) for _, js in ex.arm.log]
+    want = e2 + config.GRIP_RETRY_FIRST * config.GRIP_RETRY_MM * along
+    assert any(np.linalg.norm(p - e2) < 0.3 for p in xy)
+    assert any(np.linalg.norm(p - want) < 0.3 for p in xy)
+
+
+def test_grip_missed_twice_stops(tmp_path):
+    br = make_robot(tmp_path)
+    g = Game()
+    ex = Executor(DryArm(br.park["joints"] if br.park else [0, 30, 0, 0, 60, 0]), DryGripper(), br,
+                  BoardLock(str(tmp_path / "l")), log=lambda *a: None, pick_check=lambda sq: "occupied")
+    with pytest.raises(MotionError, match="missed"):
+        ex.run([br.locate(o) for o in plan_move(g, g.parse_move("e2e4"))], park=False)
+    assert [k for k, _ in ex.grip.log].count("hold") == 1 + config.GRIP_RETRIES

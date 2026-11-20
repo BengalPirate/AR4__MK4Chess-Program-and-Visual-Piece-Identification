@@ -71,6 +71,44 @@ webcam ─► board_vision.py ─► pieces.py ─────────► ch
 Castling rights, the en passant square and the turn are kept by the game
 state; a position read from the camera alone is never trusted for them.
 
+## Cameras
+
+Two webcams watch the board (`config.CAMERAS`):
+
+| View | Camera | Position | Calibration file |
+|---|---|---|---|
+| `front` | Logitech C930e | behind White (rank 1 nearest) | `config/board_image.json` |
+| `side` | Logitech C920 PRO | beside the a-file (Black on the left of its image) | `config/board_image_side.json` |
+
+`cameras.py` opens every attached camera by name, preferring the direct USB
+device over the Parallels-virtualised copy (which gives no frames), so the
+`/dev/videoN` numbers can change freely. Every scan classifies all 64 squares in
+each view and fuses the two per-square probability tables (weighted geometric
+mean, `pieces.fuse`), so a square hidden from one camera can still be read from
+the other, and a square the cameras disagree on becomes uncertain and pauses
+instead of being guessed. Each camera has its own empty-board reference and bump
+check; a bumped camera pauses the game. `live_view.py` shows both views for aiming.
+
+**USB bandwidth fix (resolution/frame rate).** Both webcams run at 1280 x 720
+(the resolution the classifier crops were made at), but with both open at the
+default 30 fps the second camera delivered no frames at all: the Parallels USB
+passthrough cannot reserve the isochronous bandwidth for two 720p/30 fps MJPG
+streams. Measured over 4 s with both cameras open:
+
+| Setting (both cameras, MJPG) | front frames | side frames |
+|---|---|---|
+| 1280 x 720 @ 30 fps | 83 | **0** |
+| 1280 x 720 @ 15 fps | 42 | 43 |
+| 1280 x 720 @ 10 fps | 25 | 26 |
+| 1024 x 576 @ 30 fps | 89 | 90 |
+| 640 x 480 @ 30 fps | 89 | 90 |
+
+We keep 1280 x 720 and cap the frame rate at 15 fps (`config.CAMERA_FPS`, applied
+in `board_vision.open_camera`); a scan needs only 5 frames, and full resolution
+keeps the crops sharp. Lowering the resolution would also work but would change
+the crops the classifier was trained on. The decoder occasionally reports a
+"Corrupt JPEG data" frame; averaging over 5 frames per scan absorbs it.
+
 ## Safety
 
 - Hardware E-stop (the firmware's E-stop flag is detected and stops the sequence).
@@ -107,7 +145,7 @@ state; a position read from the camera alone is never trusted for them.
 |---|---|---|
 | Joint calibration J1–J4, J6 (limit switches; J5 excluded) | Annin HMI | controller angles |
 | J5 zero by eye (gripper in line with the forearm) and its safe range | `manual_calib.py` | `config/joint_limits.json` |
-| Camera: empty board in view | `calibrate_camera.py` | `config/board_image.json` |
+| Cameras: empty board in view of both | `calibrate_camera.py` (or K in the app) | `config/board_image.json`, `config/board_image_side.json`, `results/calibration_<camera>.png` |
 | Board in robot coordinates: closed jaw tips touching a1, h1, h8, a8; tray; PARK | `robot_setup.py` | `config/board_robot.json` |
 | Check reach / heights on real pieces | `reach_check.py`, `hover_test.py` | – |
 
@@ -127,7 +165,7 @@ python chess_demo.py --robot    # also connects the AR4 and gripper; X executes
 Keys are listed at the top of `chess_demo.py` (SPACE scan, P engine move,
 M manual / AI mode, X execute, Y live labels, V set game from the board, U undo …).
 
-Other tools: `live_view.py` (aim the camera), `save_board.py` (save a labelled
+Other tools: `live_view.py` (both cameras side by side, to aim them), `save_board.py` (save a labelled
 board for training or testing), `tests/eval_webcam.py` (accuracy and
 move-inference test on saved boards), `shift_test.py` (arm test: move pieces
 two ranks), `gripper_test.py`, `jog_joint.py`.
@@ -139,6 +177,7 @@ two ranks), `gripper_test.py`, `jog_joint.py`.
 | `chess_demo.py` | Main program: live view, recognition, game, move selection, robot plan / execution |
 | `chess_logic.py` | Game state (python-chess), legal-move inference from recognition, engine |
 | `board_vision.py` | Camera discovery, board geometry, square crops, empty-board reference |
+| `cameras.py` | All board cameras: capture threads, per-camera calibration and bump check |
 | `pieces.py` | Piece classifier (fine-tuned ResNet-18; logistic-regression fallback) |
 | `photo_dataset.py`, `train_photos.py`, `finetune.py`, `train.py` | Dataset building and training |
 | `planner.py` | Moves → pick / place ops; square, tray and reserve positions |

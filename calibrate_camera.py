@@ -1,51 +1,59 @@
-"""Calibrate the board in the camera image (board must be EMPTY).
+"""Calibrate the board in every camera's image (board must be EMPTY).
 
-  python calibrate_camera.py               auto: finds the tile corners, saves
-                                           config/board_image.json + empty reference
-  python calibrate_camera.py --rank-near-camera 8   if rank 8 is printed nearest the camera
-Writes results/calibration.png showing the 64 squares with a1 and h8 marked.
+  python calibrate_camera.py                 all attached cameras (config.CAMERAS)
+  python calibrate_camera.py --camera side   one camera
+  python calibrate_camera.py --camera side --image empty.jpg   from a saved frame
+Each camera: finds the 49 inner tile corners, fits its camera model, saves its
+calibration file + empty-board reference, and writes results/calibration_<camera>.png
+with the 64 squares, a1 and h8 marked (check them!).
 """
 import argparse
 import os
-import time
 
 import cv2
 
 import config
-from board_vision import BoardGeometry, auto_calibrate, detect_markers, open_camera
+from cameras import View
+
+
+def report(v, geo, frame):
+    img = frame.copy()
+    geo.draw(img)
+    os.makedirs(config.RESULTS_DIR, exist_ok=True)
+    out = os.path.join(config.RESULTS_DIR, f"calibration_{v.key}.png")
+    cv2.imwrite(out, img)
+    print(f"[{v.key}] corners a1,h1,h8,a8 = {[[round(c) for c in p] for p in geo.corners_px.tolist()]}")
+    print(f"[{v.key}] focal {geo.K[0, 0]:.0f} px, lens k1 {0 if geo.dist is None else geo.dist.ravel()[0]:.3f}, "
+          f"fit error {geo.reproj_px if geo.reproj_px is None else round(geo.reproj_px, 2)} px, "
+          f"camera at {geo.cam_in_board.round(1)} squares (x = files, y = ranks, z = up)")
+    print(f"[{v.key}] saved {v.cfg['file']}, empty reference, and {out}")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--rank-near-camera", type=int, default=1, choices=(1, 8))
-    ap.add_argument("--image", help="use a saved image instead of the camera")
+    ap.add_argument("--camera", choices=list(config.CAMERAS))
+    ap.add_argument("--image", help="use a saved image instead of the camera (needs --camera)")
     a = ap.parse_args()
-    if a.image:
-        frame = cv2.imread(a.image)
-    else:
-        cap, _ = open_camera()
-        for _ in range(15):
-            ok, frame = cap.read()
-        time.sleep(0.2)
-        ok, frame = cap.read()
-    found = auto_calibrate(frame, a.rank_near_camera)
-    if found is None:
-        raise SystemExit("Board pattern not found - is the board empty and fully in view?")
-    corners, inner = found
-    geo = BoardGeometry(corners, (frame.shape[1], frame.shape[0]), detect_markers(frame), inner)
-    corners = geo.corners_px.tolist()
-    geo.save()
-    geo.set_reference(frame)
-    img = frame.copy()
-    geo.draw(img)
-    os.makedirs(config.RESULTS_DIR, exist_ok=True)
-    out = os.path.join(config.RESULTS_DIR, "calibration.png")
-    cv2.imwrite(out, img)
-    print(f"corners a1,h1,h8,a8 = {[[round(v) for v in c] for c in corners]}")
-    print(f"focal {geo.K[0, 0]:.0f} px, lens k1 {0 if geo.dist is None else geo.dist.ravel()[0]:.3f}, "
-          f"fit error {geo.reproj_px if geo.reproj_px is None else round(geo.reproj_px, 2)} px, "
-          f"camera at {geo.cam_in_board.round(1)} squares")
-    print(f"saved {config.BOARD_IMAGE_FILE}, empty reference, and {out}")
+    keys = [a.camera] if a.camera else list(config.CAMERAS)
+    failed = []
+    for key in keys:
+        try:
+            v = View(key, start=not a.image)
+        except Exception as e:      # noqa: BLE001
+            print(f"[{key}] camera not available: {e}")
+            failed.append(key)
+            continue
+        frame = cv2.imread(a.image) if a.image else v.settled_frame()
+        geo = v.calibrate(frame)
+        if geo is None:
+            print(f"[{key}] board pattern not found - is the board empty and fully in view?")
+            cv2.imwrite(os.path.join(config.RESULTS_DIR, f"calibration_{key}_failed.png"), frame)
+            failed.append(key)
+        else:
+            report(v, geo, frame)
+        v.release()
+    if failed:
+        raise SystemExit(f"not calibrated: {', '.join(failed)}")
 
 
 if __name__ == "__main__":

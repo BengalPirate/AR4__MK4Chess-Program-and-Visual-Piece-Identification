@@ -25,6 +25,16 @@ Ambiguous case found: the first 4 test boards came from a lower camera angle
 where the e2 pawn hides behind the e1 king; every move test on them paused
 (safe, but unusable). Raising the camera fixed it (83 % → 98.7 %).
 
+### Second camera (2026-11-17)
+
+| Test | Result | Change made |
+|---|---|---|
+| Both webcams attached to the VM | each streams alone at 1280 x 720 | – |
+| Both open at 1280 x 720, 30 fps | front 83 frames in 4 s, side **0** (USB passthrough bandwidth) | – |
+| Both at 1280 x 720, 15 fps | front 42, side 43 frames in 4 s | `CAMERA_FPS = 15` for every camera |
+| Both at lower resolutions, 30 fps | 1024 x 576 and 640 x 480 both work | not used: keeps the training resolution |
+| Chess app with both views | both live, side to side | – |
+
 ## 2. Arm and gripper
 
 | Test | Result | Change made |

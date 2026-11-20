@@ -41,11 +41,14 @@ import cv2
 import numpy as np
 
 import config
-from board_vision import BoardGeometry, open_camera, refine_corners_empty_board
-from chess_logic import LABELS, Engine, Game, board_from_labels, square_labels
-from planner import BoardRobot, plan_move
+from board_vision import BoardGeometry, detect_markers, refine_corners_empty_board
+from cameras import open_views
+from chess_logic import LABELS, Engine, Game, board_from_labels
+from planner import BoardRobot, plan_move, plan_robot_move
 
-W_CAM, H_CAM = 960, 540                 # displayed camera size
+VW, VH = 720, 405                       # displayed size of each camera view
+H_CAM = VH
+CANVAS_H = 720
 PANEL_W = 520
 GREEN, RED, AMBER, WHITE, CYAN, GREY = (0, 200, 0), (0, 0, 255), (0, 170, 255), \
     (255, 255, 255), (255, 255, 0), (150, 150, 150)
@@ -62,45 +65,13 @@ SETUPS = [   # positions to arrange physically for training data (I key)
 ]
 
 
-class Camera:
-    """Grabs frames on a thread so the newest frame is always available."""
-
-    def __init__(self):
-        self.cap, self.device = open_camera()
-        self.frame, self.n = None, 0
-        self.lock = threading.Lock()
-        threading.Thread(target=self._run, daemon=True).start()
-
-    def _run(self):
-        while True:
-            ok, f = self.cap.read()
-            if ok:
-                with self.lock:
-                    self.frame, self.n = f, self.n + 1
-
-    def get(self):
-        with self.lock:
-            return (None if self.frame is None else self.frame.copy()), self.n
-
-    def frames(self, k):
-        out, last = [], -1
-        t_end = time.time() + 5
-        while len(out) < k and time.time() < t_end:
-            f, n = self.get()
-            if f is not None and n != last:
-                out.append(f)
-                last = n
-            time.sleep(0.03)
-        return out
-
-
 class App:
     def __init__(self, args):
         self.args = args
-        self.cam = Camera()
-        self.geo = BoardGeometry.load()
-        if self.geo:
-            self.geo.load_reference()
+        if args.rank_near_camera:
+            config.CAMERAS["front"]["near"] = f"rank{args.rank_near_camera}"
+        self.views = open_views()           # every attached board camera (cameras.py)
+        self.calib_view = None              # view being calibrated by clicks
         self.game = Game()
         self.engine = Engine()
         self.clf = self._load_classifier()
@@ -153,7 +124,16 @@ class App:
             raise SystemExit("--robot needs config/board_robot.json (run board_teach.py)")
         self.arm = AR4(safe=True, j5_window=config.J5_WINDOW)
         self.gripper = Gripper()
-        self.executor = Executor(self.arm, self.gripper, self.br, BoardLock(), log=print)
+        check = None
+        if self.clf is not None:
+            from grip_check import PickChecker
+            check = PickChecker(self.views, self.clf)   # cameras confirm each pick; misses are retried
+        reader = None
+        if config.OFFSET_CORRECTION and self.views:
+            from offset_model import OffsetReader
+            reader = OffsetReader(self.views)          # piece off centre -> pick shifted 15 mm
+        self.executor = Executor(self.arm, self.gripper, self.br, BoardLock(), log=print, pick_check=check,
+                                 offset_reader=reader)
         print(f"Robot connected: {self.arm.pose()}")
 
     def say(self, text, col=WHITE):
@@ -161,15 +141,23 @@ class App:
         print(text)
 
     # ------------------------------------------------------------ recognition
-    def calibration_ok(self, frame):
-        if self.geo is None:
-            return False, "Board not calibrated - press K"
-        al = self.geo.tile_alignment(frame)
-        if al is not None and al < config.MIN_TILE_ALIGNMENT:
-            return False, f"Board/camera moved (tile alignment {al:.2f}) - recalibrate (K)"
-        mv = self.geo.camera_moved(frame)
-        if mv is not None and mv > config.CAMERA_MOVED_PX:
-            return False, f"Camera moved ({mv:.0f} px at the markers) - recalibrate (K)"
+    @property
+    def geo(self):
+        """Geometry of the first calibrated view (for code that needs any one)."""
+        return next((v.geo for v in self.views if v.geo is not None), None)
+
+    def grab(self, k):
+        """k frames from every view: [(view, frames)]."""
+        return [(v, v.frames(k)) for v in self.views]
+
+    def calibration_ok(self, grabbed):
+        """Every view calibrated and not moved; a bumped camera pauses the game."""
+        for v, frames in grabbed:
+            if not frames:
+                return False, f"{v.key} camera gives no frames"
+            ok, why = v.check(frames[-1])
+            if not ok:
+                return False, why
         return True, ""
 
     def run_scan(self, infer=True):
@@ -183,27 +171,31 @@ class App:
 
         def work():
             try:
-                frames = self.cam.frames(config.SCAN_FRAMES)
-                ok, why = self.calibration_ok(frames[-1])
+                from pieces import scan_views
+                grabbed = self.grab(config.SCAN_FRAMES)
+                ok, why = self.calibration_ok(grabbed)
                 if not ok:
                     self.verified = False
                     self.say("PAUSED: " + why, RED)
                     return
-                logp = self.clf.logp([self.geo.crops(f) for f in frames])
+                logp, per_view = scan_views(self.clf, [(v.key, v.geo, fr) for v, fr in grabbed])
                 for sq, lab in self.overrides.items():          # operator corrections
                     logp[sq][:] = np.log(1e-6)
                     logp[sq][LABELS.index(lab)] = 0.0
                 p = np.exp(logp)
                 labels = [LABELS[i] for i in p.argmax(axis=1)]
                 conf = p.max(axis=1)
-                self.scan = {"labels": labels, "conf": conf, "logp": logp,
-                             "frame": frames[-1], "time": time.time()}
+                view_labels = {k: [LABELS[i] for i in lp.argmax(axis=1)] for k, lp in per_view.items()}
+                self.scan = {"labels": labels, "conf": conf, "logp": logp, "view_labels": view_labels,
+                             "frames": {v.key: fr[-1] for v, fr in grabbed}, "time": time.time()}
                 if infer:
                     self._interpret()
                 else:
                     unsure = int((conf < config.MIN_SQUARE_CONF).sum())
-                    self.say(f"Live: {sum(c != '.' for c in labels)} pieces, "
-                             f"{unsure} uncertain squares", AMBER if unsure else GREEN)
+                    dis = self._disagree()
+                    self.say(f"Live: {sum(c != '.' for c in labels)} pieces, {unsure} uncertain squares"
+                             + (f", cameras disagree on {len(dis)}" if dis else ""),
+                             AMBER if unsure else GREEN)
             except Exception as e:      # noqa: BLE001
                 self.verified = False
                 self.say(f"PAUSED: scan failed: {e}", RED)
@@ -212,11 +204,18 @@ class App:
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _disagree(self):
+        """Squares where the camera views give different labels."""
+        vl = list(self.scan.get("view_labels", {}).values()) if self.scan else []
+        if len(vl) < 2:
+            return []
+        return [sq for sq in range(64) if len({v[sq] for v in vl}) > 1]
+
     def _interpret(self):
         s, g = self.scan, self.game
         inf = g.infer_move(s["logp"])
         s["inference"] = inf
-        truth_now = square_labels(g.board)
+        truth_now = g.physical_labels()
         self.highlight = {}
         if inf["move"] is None and g.confident(inf):
             self.verified = True
@@ -266,6 +265,7 @@ class App:
         g = self.game
         try:
             san = g.board.san(move)
+            steps = g.tray_after(move)[2] if move in g.board.legal_moves else []
             g.push(move)
         except ValueError as e:
             self.say(f"REJECTED: {e}", RED)
@@ -273,12 +273,24 @@ class App:
         self.pending, self.plan, self.overrides = None, None, {}
         self.highlight = {move.from_square: CYAN, move.to_square: CYAN}
         if self.scan is not None and how == "vision":
-            self._log_scan(square_labels(g.board), "move")
+            self._log_scan(g.physical_labels(), "move")
             if self.args.auto_learn:
-                from pieces import save_sample
-                save_sample(self.scan["frame"], self.geo, square_labels(g.board), "game")
+                self._save_views(self.scan["frames"], g.physical_labels(), "game")
         self.verified = how == "vision"
-        self.say(f"{san} played ({how}). {g.status()}", GREEN)
+        tray_note = ""
+        if steps and how not in ("robot", "simulated"):
+            # a move made by hand: tell the operator where the tray pieces go, so the
+            # physical tray keeps matching the game's record of it
+            parts = []
+            for kind, slot, pc in steps:
+                if kind == "in":
+                    parts.append(f"put the {pc} in tray slot {slot}")
+                elif slot == "reserve":
+                    parts.append(f"use the spare {pc} from the reserve spot")
+                else:
+                    parts.append(f"take the {pc} from tray slot {slot}")
+            tray_note = " TRAY: " + "; ".join(parts) + "."
+        self.say(f"{san} played ({how}). {g.status()}{tray_note}", AMBER if tray_note else GREEN)
 
     def engine_move(self):
         g = self.game
@@ -290,9 +302,7 @@ class App:
 
     def set_plan(self, m, who):
         g = self.game
-        ops = plan_move(g, m)
-        if self.br:
-            ops = [self.br.locate(o) for o in ops]
+        ops = plan_robot_move(g, m, self.br) if self.br else plan_move(g, m)
         self.plan = (m, ops)
         self.highlight = {m.from_square: CYAN, m.to_square: CYAN}
         print(f"\n{who} selects {g.board.san(m)} = {m.uci()}")
@@ -428,19 +438,7 @@ class App:
                 self.game = Game(fen)
                 self.say(f"Setup {self.setup_idx + 1}/{len(SETUPS)}: {name}. Arrange it, then L", CYAN)
         elif ch == "k":
-            frame, _ = self.cam.get()
-            from board_vision import auto_calibrate, detect_markers
-            found = auto_calibrate(frame, self.args.rank_near_camera)
-            if found is not None:
-                self.geo = BoardGeometry(found[0], config.FRAME_SIZE, detect_markers(frame), found[1])
-                self.geo.save()
-                self.geo.set_reference(frame)
-                self.say(f"Board found automatically (fit {self.geo.reproj_px:.1f} px); empty "
-                         "reference stored", GREEN)
-            else:
-                self.calib_clicks = []
-                self.say("Tile pattern not found (pieces on the board?). Click the OUTER corner "
-                         "of a1, then h1, h8, a8", CYAN)
+            self.calibrate_all()
         elif ch == "e":
             self.store_empty()
         elif ch == "u":
@@ -460,9 +458,13 @@ class App:
     def on_mouse(self, event, x, y, flags, _):
         if event != cv2.EVENT_LBUTTONDOWN:
             return
-        if x < W_CAM:
-            fx, fy = x * config.FRAME_SIZE[0] / W_CAM, y * config.FRAME_SIZE[1] / H_CAM
+        if x < VW * len(self.views) and y < VH:
+            v = self.views[x // VW]
+            fx, fy = (x % VW) * config.FRAME_SIZE[0] / VW, y * config.FRAME_SIZE[1] / VH
             if self.calib_clicks is not None:
+                if v is not self.calib_view:
+                    self.say(f"Click in the {self.calib_view.key} view", AMBER)
+                    return
                 self.calib_clicks.append((fx, fy))
                 names = ["a1", "h1", "h8", "a8"]
                 if len(self.calib_clicks) < 4:
@@ -470,13 +472,13 @@ class App:
                 else:
                     self.finish_calibration()
                 return
-            if self.geo is None:
+            if v.geo is None:
                 return
             # pick the square whose column (z = 0.5 square) is nearest the click
-            d = [np.hypot(*(self.geo.square_center(sq, 0.5) - (fx, fy))) for sq in range(64)]
+            d = [np.hypot(*(v.geo.square_center(sq, 0.5) - (fx, fy))) for sq in range(64)]
             self.selected = int(np.argmin(d))
-        else:
-            sq = self.panel_square(x - W_CAM, y)
+        elif x >= VW * len(self.views):
+            sq = self.panel_square(x - VW * len(self.views), y)
             if sq is None:
                 return
             if self.manual:
@@ -519,44 +521,82 @@ class App:
                  "click one", CYAN)
 
     # ------------------------------------------------------------ calibration / data
+    def calibrate_all(self):
+        """K: auto-calibrate every camera on the empty board. A view whose tiles are
+        not found falls back to clicking its four corners."""
+        if self.busy:
+            return
+        self.busy = True
+
+        def work():
+            try:
+                done, failed = [], []
+                for v in self.views:
+                    geo = v.calibrate()
+                    if geo is None:
+                        failed.append(v)
+                    else:
+                        done.append(f"{v.key} {geo.reproj_px:.1f} px")
+                if failed:
+                    self.calib_view, self.calib_clicks = failed[0], []
+                    self.say(f"Calibrated: {', '.join(done) or 'none'}. {failed[0].key}: tiles not found "
+                             f"(pieces on the board?) - click the OUTER corner of a1, then h1, h8, a8 "
+                             f"in the {failed[0].key} view", CYAN)
+                else:
+                    self.say(f"All cameras calibrated (fit: {', '.join(done)}); empty references stored",
+                             GREEN)
+            finally:
+                self.busy = False
+
+        threading.Thread(target=work, daemon=True).start()
+
     def finish_calibration(self):
-        frame, _ = self.cam.get()
-        from board_vision import detect_markers
+        v = self.calib_view
+        frame, _ = v.get()
         corners = self.calib_clicks
-        self.calib_clicks = None
+        self.calib_clicks, self.calib_view = None, None
         refined = refine_corners_empty_board(frame, corners)
         if refined is not None:
             corners = refined
             note = "refined from the 49 inner tile corners"
         else:
             note = "from clicks (board not empty or pattern not found: no refinement)"
-        self.geo = BoardGeometry(corners, config.FRAME_SIZE, detect_markers(frame))
-        self.geo.save()
-        self.geo.set_reference(frame) if refined is not None else None
-        self.say(f"Board calibrated ({note}). "
+        v.geo = BoardGeometry(corners, config.FRAME_SIZE, detect_markers(frame))
+        v.geo.save(v.cfg["file"])
+        v.geo.set_reference(frame) if refined is not None else None
+        self.say(f"{v.key} camera calibrated ({note}). "
                  + ("Empty reference stored." if refined is not None else "Press E with the board empty."),
                  GREEN)
 
     def store_empty(self):
-        if self.geo is None:
+        if any(v.geo is None for v in self.views):
             self.say("Calibrate first (K)", AMBER)
             return
-        frame, _ = self.cam.get()
-        self.geo.set_reference(frame)
-        self.say("Empty-board reference stored (tile alignment and change detection)", GREEN)
+        for v in self.views:
+            v.geo.set_reference(v.get()[0])
+        self.say("Empty-board references stored for every camera", GREEN)
+
+    def _save_views(self, frames_by_view, labels, source):
+        """One labelled sample per camera, sharing a stamp."""
+        from pieces import save_sample
+        stamp = None
+        for v in self.views:
+            f = frames_by_view.get(v.key)
+            if f is not None and v.geo is not None:
+                stamp = save_sample(f, v.geo, labels, source, camera=v.key, stamp=stamp)
 
     def learn(self):
-        if self.geo is None:
+        if any(v.geo is None for v in self.views):
             self.say("Calibrate first (K)", AMBER)
             return
-        from pieces import save_sample
-        frames = self.cam.frames(3)
-        labels = square_labels(self.game.board)
-        for f in frames:
-            save_sample(f, self.geo, labels, "setup" if self.setup_idx >= 0 else "manual")
+        labels = self.game.physical_labels()
+        grabbed = self.grab(3)
+        for i in range(3):
+            self._save_views({v.key: fr[i] for v, fr in grabbed if len(fr) > i}, labels,
+                             "setup" if self.setup_idx >= 0 else "manual")
         n = len([f for f in os.listdir(config.DATA_DIR) if f.endswith(".json")])
-        self.say(f"Saved {len(frames)} labelled frames of this position ({n} total). "
-                 "Move pieces to another position, then L again; T trains", GREEN)
+        self.say(f"Saved 3 labelled frames of this position from {len(self.views)} camera(s) "
+                 f"({n} samples total). Move pieces to another position, then L again; T trains", GREEN)
 
     def train(self):
         if self.busy:
@@ -610,7 +650,7 @@ class App:
         return chess.square(f, r) if 0 <= f < 8 and 0 <= r < 8 else None
 
     def draw_panel(self):
-        p = np.full((H_CAM + 180, PANEL_W, 3), 30, np.uint8)
+        p = np.full((CANVAS_H, PANEL_W, 3), 30, np.uint8)
         g = self.game.board
         S, X0, Y0 = self.SQ, self.BX, self.BY
         cv2.putText(p, f"Game state - {'MANUAL' if self.manual else 'AI'} mode", (X0, 25),
@@ -631,6 +671,10 @@ class App:
                 cv2.circle(p, (x + S // 2, y + S // 2), S // 2 - 7, edge, 1, cv2.LINE_AA)
                 cv2.putText(p, pc.symbol().upper(), (x + S // 2 - 9, y + S // 2 + 8),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, edge, 2, cv2.LINE_AA)
+                if sq in self.game.standins:     # a pawn standing in for a promoted piece
+                    cv2.circle(p, (x + S // 2, y + S // 2), S // 2 - 3, (255, 0, 255), 2, cv2.LINE_AA)
+                    cv2.putText(p, "p", (x + S - 13, y + 13), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                                (255, 0, 255), 1, cv2.LINE_AA)
         for i in range(8):
             cv2.putText(p, "abcdefgh"[i], (X0 + i * S + S // 2 - 5, Y0 + 8 * S + 16),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, GREY, 1)
@@ -644,7 +688,8 @@ class App:
                             cv2.LINE_AA, tipLength=0.25)
         y = Y0 + 8 * S + 40
         lines = [(self.game.status(), WHITE), (self.game.rights_text(), GREY),
-                 (f"captured tray: {' '.join(self.game.tray) or '-'}", GREY),
+                 (f"stand-ins: {self.game.standin_text()}", GREY),
+                 (f"tray (slot:piece): {self.game.tray_text()}" + ("  spare used" if self.game.reserve_used else ""), GREY),
                  (f"engine: {self.engine.name}", GREY),
                  (f"classifier: {(self.clf.info.get('kind') or 'trained on ' + str(self.clf.info['boards']) + ' boards') if self.clf else 'NOT TRAINED'}",
                   GREY if self.clf else AMBER),
@@ -661,9 +706,11 @@ class App:
             y += 20
         return p
 
-    def draw(self, frame):
+    def draw_view(self, v, frame):
         img = frame.copy()
-        if self.geo is not None:
+        geo = v.geo
+        dis = set(self._disagree())
+        if geo is not None:
             labels, colors = {}, [(170, 170, 170)] * 64
             if self.scan is not None:
                 for sq in range(64):
@@ -672,25 +719,38 @@ class App:
                         labels[sq] = (lab, GREEN if c >= config.MIN_SQUARE_CONF else AMBER)
                     elif c < config.MIN_SQUARE_CONF:
                         labels[sq] = ("?", AMBER)
+                vl = self.scan.get("view_labels", {}).get(v.key)
+                for sq in dis:               # this camera's own reading where the views differ
+                    if vl:
+                        labels[sq] = (vl[sq], (255, 0, 255))
+                colors = list(colors)
                 for sq, col in self.highlight.items():
-                    colors = list(colors)
                     colors[sq] = col
-            self.geo.draw(img, labels, colors)
+            geo.draw(img, labels, colors)
             if self.selected is not None:
-                cv2.polylines(img, [self.geo.square_polygon(self.selected).astype(np.int32)], True,
+                cv2.polylines(img, [geo.square_polygon(self.selected).astype(np.int32)], True,
                               (255, 0, 255), 3)
             arrow = self.plan[0] if self.plan else self.pending
             if arrow:
-                a = tuple(int(v) for v in self.geo.square_center(arrow.from_square))
-                b = tuple(int(v) for v in self.geo.square_center(arrow.to_square))
+                a = tuple(int(c) for c in geo.square_center(arrow.from_square))
+                b = tuple(int(c) for c in geo.square_center(arrow.to_square))
                 cv2.arrowedLine(img, a, b, (0, 140, 255), 5, cv2.LINE_AA, tipLength=0.2)
-        if self.calib_clicks is not None:
+        if self.calib_clicks is not None and v is self.calib_view:
             for pt in self.calib_clicks:
                 cv2.circle(img, (int(pt[0]), int(pt[1])), 8, CYAN, 2)
-        cam = cv2.resize(img, (W_CAM, H_CAM))
-        canvas = np.full((H_CAM + 180, W_CAM + PANEL_W, 3), 20, np.uint8)
-        canvas[:H_CAM, :W_CAM] = cam
-        canvas[:, W_CAM:] = self.draw_panel()
+        img = cv2.resize(img, (VW, VH))
+        title = f"{v.key} {v.device}" + ("" if geo else "  NOT CALIBRATED")
+        cv2.putText(img, title, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 4, cv2.LINE_AA)
+        cv2.putText(img, title, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+                    CYAN if geo else RED, 2, cv2.LINE_AA)
+        return img
+
+    def draw(self, frames):
+        n = len(self.views)
+        canvas = np.full((CANVAS_H, VW * n + PANEL_W, 3), 20, np.uint8)
+        for i, (v, f) in enumerate(zip(self.views, frames)):
+            canvas[:VH, i * VW:(i + 1) * VW] = self.draw_view(v, f) if f is not None else 0
+        canvas[:, VW * n:] = self.draw_panel()
         y = H_CAM + 28
         cv2.putText(canvas, self.msg[:120], (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, self.msg_col, 1, cv2.LINE_AA)
         if len(self.msg) > 120:
@@ -701,7 +761,8 @@ class App:
         help_txt = ("SPACE scan  ENTER accept/submit  M mode  P engine  X execute  Y live  V set-from-vision  "
                     "L learn  T train  I setups  K calib  E empty-ref  U undo  Z new  S shot  J quit")
         cv2.putText(canvas, help_txt, (12, y + 90), cv2.FONT_HERSHEY_SIMPLEX, 0.45, GREY, 1, cv2.LINE_AA)
-        cv2.putText(canvas, "click a square + type a piece letter to correct the scan",
+        cv2.putText(canvas, "click a square + type a piece letter to correct the scan; "
+                    "magenta = this camera's reading where the cameras disagree",
                     (12, y + 112), cv2.FONT_HERSHEY_SIMPLEX, 0.45, GREY, 1, cv2.LINE_AA)
         self.canvas = canvas
         return canvas
@@ -712,14 +773,14 @@ class App:
         cv2.setMouseCallback("AR4 chess", self.on_mouse)
         last_live = 0
         while True:
-            frame, _ = self.cam.get()
-            if frame is None:
+            frames = [v.get()[0] for v in self.views]
+            if all(f is None for f in frames):
                 time.sleep(0.05)
                 continue
             if self.live and not self.busy and time.time() - last_live > 1.0:
                 last_live = time.time()
                 self.run_scan(infer=False)
-            cv2.imshow("AR4 chess", self.draw(frame))
+            cv2.imshow("AR4 chess", self.draw(frames))
             if self.args.snapshot and time.time() - getattr(self, "_snap_t", 0) > 2:
                 self._snap_t = time.time()
                 cv2.imwrite(self.args.snapshot, self.canvas)
@@ -732,8 +793,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--robot", action="store_true", help="connect the AR4 and gripper")
     ap.add_argument("--snapshot", help="also write the window image to this file every 2 s")
-    ap.add_argument("--rank-near-camera", type=int, default=1, choices=(1, 8),
-                    help="printed rank nearest the camera (orientation for auto calibration)")
+    ap.add_argument("--rank-near-camera", type=int, choices=(1, 8),
+                    help="override the front camera's nearest rank (config.CAMERAS)")
     ap.add_argument("--no-auto-learn", dest="auto_learn", action="store_false",
                     help="do not save confirmed game positions as training data")
     App(ap.parse_args()).loop()

@@ -1,43 +1,47 @@
-"""Live camera view with the board grid (if calibrated) and a framing guide.
+"""Live view of every board camera side by side, with each camera's saved grid,
+for aiming the cameras. Q or ESC quits.
 
-  python live_view.py [--snapshot PATH] [--no-grid]    Q or ESC quits
-The window shows the frame edges in red where the board or pieces would be cut
-off. With --snapshot the latest frame is also written to PATH once a second.
+  python live_view.py [--snapshot PREFIX] [--no-grid]
+With --snapshot each camera's latest frame is written to PREFIX_<camera>.jpg once a second.
 """
 import argparse
 import time
 
 import cv2
+import numpy as np
 
-from board_vision import BoardGeometry, open_camera
+from cameras import open_views, tile
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--snapshot")
-    ap.add_argument("--no-grid", action="store_true", help="hide the saved grid (e.g. while re-aiming)")
+    ap.add_argument("--no-grid", action="store_true", help="hide the saved grids (e.g. while re-aiming)")
     a = ap.parse_args()
-    cap, dev = open_camera()
-    geo = None if a.no_grid else BoardGeometry.load()
-    cv2.namedWindow("AR4 camera", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("AR4 camera", 1280, 720)
+    views = open_views()
+    cv2.namedWindow("AR4 cameras", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("AR4 cameras", 1600, 520)
     last = 0
     while True:
-        ok, f = cap.read()
-        if not ok:
-            continue
+        imgs, names = [], []
+        for v in views:
+            f, _ = v.get()
+            if f is None:
+                f = np.zeros((720, 1280, 3), np.uint8)
+            elif a.snapshot and time.time() - last > 1.0:
+                cv2.imwrite(f"{a.snapshot}_{v.key}.jpg", f)
+            img = f.copy()
+            h, w = img.shape[:2]
+            if v.geo is not None and not a.no_grid:
+                v.geo.draw(img)
+            cv2.rectangle(img, (0, 0), (w - 1, h - 1), (0, 0, 255), 3)
+            cv2.drawMarker(img, (w // 2, h // 2), (0, 255, 255), cv2.MARKER_CROSS, 40, 2)
+            imgs.append(img)
+            names.append(f"{v.key}  {v.device}" + ("" if v.geo else "  (not calibrated)"))
         if a.snapshot and time.time() - last > 1.0:
-            cv2.imwrite(a.snapshot, f)
             last = time.time()
-        img = f.copy()
-        h, w = img.shape[:2]
-        if geo is not None:
-            geo.draw(img)
-        cv2.rectangle(img, (0, 0), (w - 1, h - 1), (0, 0, 255), 2)
-        cv2.putText(img, f"{dev}  {w}x{h}   whole board + tops of far pieces must be inside",
-                    (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-        cv2.imshow("AR4 camera", img)
-        if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
+        cv2.imshow("AR4 cameras", tile(imgs, names))
+        if cv2.waitKey(30) & 0xFF in (ord("q"), 27):
             break
 
 

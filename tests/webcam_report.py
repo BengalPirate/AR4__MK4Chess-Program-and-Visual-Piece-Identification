@@ -21,7 +21,9 @@ START = "RNBQKBNRPPPPPPPP" + "." * 32 + "pppppppprnbqkbnr"
 
 
 def main():
-    clf = PieceClassifier()
+    model = os.environ.get("AR4_MODEL")          # e.g. models/piece_cnn_B.pt
+    tag = os.environ.get("AR4_TAG", "webcam")
+    clf = PieceClassifier(cnn_path=model) if model else PieceClassifier()
     L = np.array(LABELS)
     groups = {"all": [], "start": [], "other": []}
     per_board = []
@@ -33,7 +35,7 @@ def main():
             groups[g].append((labels, pred))
         per_board.append((stamp, key, sum(p == t for p, t in zip(pred, labels))))
     out = [f"# Webcam recognition accuracy (held-out boards)\n\nGenerated {time.strftime('%Y-%m-%d %H:%M')} "
-           f"with models/piece_cnn.pt (trained {clf.info.get('trained')}). Boards in data_webcam_test/ "
+           f"with {model or 'models/piece_cnn.pt'} (trained {clf.info.get('trained')}). Boards in data_webcam_test/ "
            "were never used for training. One frame per saved board.\n"]
     for g, title in (("all", "All held-out webcam boards"), ("start", "Start positions"),
                      ("other", "Other positions")):
@@ -44,10 +46,10 @@ def main():
         out.append(txt)
         print(txt.split("\n|")[0])
         if g == "all":
-            save_confusion(cm, os.path.join(config.RESULTS_DIR, "confusion_webcam_all.png"))
+            save_confusion(cm, os.path.join(config.RESULTS_DIR, f"confusion_{tag}_all.png"))
     out.append("### Per board\n\n| Board | Group | Exact squares |\n|---|---|---|\n" +
                "\n".join(f"| {s} | {k} | {n}/64 |" for s, k, n in per_board))
-    with open(os.path.join(config.RESULTS_DIR, "accuracy_webcam.md"), "w") as f:
+    with open(os.path.join(config.RESULTS_DIR, f"accuracy_{tag}.md"), "w") as f:
         f.write("\n".join(out) + "\n")
 
 

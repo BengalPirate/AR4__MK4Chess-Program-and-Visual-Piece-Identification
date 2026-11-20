@@ -64,6 +64,7 @@ def open_camera(device=None, size=config.FRAME_SIZE):
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, size[0])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, size[1])
+    cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     if not cap.isOpened():
         raise RuntimeError(f"Could not open {device}")
@@ -143,6 +144,7 @@ class BoardGeometry:
     # ---- persistence
     def save(self, path=config.BOARD_IMAGE_FILE):
         os.makedirs(os.path.dirname(path), exist_ok=True)
+        self.path = path
         with open(path, "w") as f:
             json.dump({"corners_px": self.corners_px.tolist(), "frame_size": self.frame_size,
                        "inner_px": None if self.inner_px is None else self.inner_px.tolist(),
@@ -157,7 +159,12 @@ class BoardGeometry:
             return None
         with open(path) as f:
             d = json.load(f)
-        return cls(d["corners_px"], tuple(d["frame_size"]), d.get("markers"), d.get("inner_px"))
+        geo = cls(d["corners_px"], tuple(d["frame_size"]), d.get("markers"), d.get("inner_px"))
+        geo.path = path
+        return geo
+
+    def _ref_path(self, path):
+        return path or getattr(self, "path", config.BOARD_IMAGE_FILE).replace(".json", "_empty.png")
 
     # ---- projection
     def project(self, pts3, _raw=False):
@@ -209,10 +216,10 @@ class BoardGeometry:
     def set_reference(self, empty_frame, path=None):
         td = self.topdown(empty_frame)
         self.reference = td
-        cv2.imwrite(path or config.BOARD_IMAGE_FILE.replace(".json", "_empty.png"), td)
+        cv2.imwrite(self._ref_path(path), td)
 
     def load_reference(self, path=None):
-        img = cv2.imread(path or config.BOARD_IMAGE_FILE.replace(".json", "_empty.png"))
+        img = cv2.imread(self._ref_path(path))
         self.reference = img
         return img is not None
 
@@ -321,14 +328,19 @@ def find_inner_corners(frame):
     return pts.reshape(-1, 2)
 
 
-def auto_calibrate(frame, camera_side_rank=1):
+def auto_calibrate(frame, near="rank1"):
     """Find the board on an EMPTY board with no clicks.
 
     The 7x7 inner tile corners are found by OpenCV; the outer corners are
-    extrapolated one square out. Orientation: the rank printed nearest the camera
-    (camera_side_rank, 1 or 8) is the side nearest the bottom of the image, and
-    file a is on the left when looking from that side. Returns corners
-    (a1, h1, h8, a8) or None if the pattern is not found."""
+    extrapolated one square out. Orientation: `near` is the board edge nearest
+    the camera (bottom of the image): "rank1", "rank8", "fileA" or "fileH"
+    (1 / 8 accepted for the ranks). Standing at that edge, the rest follows from
+    the board's handedness (from rank 1, file a is on the left; from file a,
+    rank 1 is on the right). Returns corners (a1, h1, h8, a8) and the 49 inner
+    corners, or None if the pattern is not found."""
+    near = {1: "rank1", 8: "rank8"}.get(near, near)
+    if near not in ("rank1", "rank8", "fileA", "fileH"):
+        raise ValueError(f"near must be rank1/rank8/fileA/fileH, not {near!r}")
     pts = find_inner_corners(frame)
     if pts is None:
         return None
@@ -339,14 +351,13 @@ def auto_calibrate(frame, camera_side_rank=1):
     # Within a row, columns left -> right in the image
     if g[:, 0, 0].mean() > g[:, -1, 0].mean():
         g = g[:, ::-1]
-    # Board coordinates of the inner corners: row i -> y = i + 1, col j -> x = j + 1,
-    # seen from the camera side. If rank 8 faces the camera, rotate 180 degrees.
+    # Board coordinates of the inner corners: row i counts away from the camera,
+    # column j left -> right in the image.
     src, dst = [], []
     for i in range(7):
         for j in range(7):
-            x, y = j + 1, i + 1
-            if camera_side_rank == 8:
-                x, y = 8 - x, 8 - y
+            x, y = {"rank1": (j + 1, i + 1), "rank8": (7 - j, 7 - i),
+                    "fileA": (i + 1, 7 - j), "fileH": (7 - i, j + 1)}[near]
             src.append((x, y))
             dst.append(g[i, j])
     H, _ = cv2.findHomography(np.float32(src), np.float32(dst))

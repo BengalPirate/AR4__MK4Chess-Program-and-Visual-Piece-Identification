@@ -105,17 +105,50 @@ class PieceClassifier:
         return p
 
 
+def fuse(view_logps, weights=None):
+    """Combine per-view 64 x 13 log-probabilities into one: weighted geometric
+    mean of the probabilities, renormalised per square. With equal weights a
+    square both cameras agree on stays confident; where they disagree it becomes
+    uncertain, so the move check pauses instead of trusting either view."""
+    if len(view_logps) == 1:
+        return view_logps[0]
+    w = np.float64(weights if weights is not None else [1.0] * len(view_logps))
+    w = w / w.sum()
+    lp = sum(wi * l for wi, l in zip(w, view_logps))
+    lp = lp - np.log(np.exp(lp).sum(axis=1, keepdims=True))
+    return np.maximum(lp, np.log(1e-6))
+
+
+def scan_views(clf, views_frames):
+    """views_frames: list of (view_key, geometry, frames). Returns the fused
+    64 x 13 log-probabilities and the per-view ones {key: logp}."""
+    per = {k: clf.logp([geo.crops(f) for f in frames]) for k, geo, frames in views_frames}
+    keys = list(per)
+    fused = fuse([per[k] for k in keys], [config.VIEW_WEIGHT.get(k, 1.0) for k in keys])
+    return fused, per
+
+
 # ---------------------------------------------------------------- dataset
-def save_sample(frame, geometry, labels, source, out_dir=config.DATA_DIR):
-    """Store a labelled board image: the frame, the board corners and 64 labels."""
+def save_sample(frame, geometry, labels, source, out_dir=config.DATA_DIR, camera=None, stamp=None):
+    """Store a labelled board image: the frame, the board corners and 64 labels.
+    Several cameras' frames of the same position share the stamp, with the camera
+    name appended (<stamp>_side.jpg); the front camera keeps the plain name."""
     import time
     os.makedirs(out_dir, exist_ok=True)
-    stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
-    cv2.imwrite(os.path.join(out_dir, stamp + ".jpg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-    with open(os.path.join(out_dir, stamp + ".json"), "w") as f:
+    stamp = stamp or time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
+    name = stamp if camera in (None, "front") else f"{stamp}_{camera}"
+    cv2.imwrite(os.path.join(out_dir, name + ".jpg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    with open(os.path.join(out_dir, name + ".json"), "w") as f:
         json.dump({"labels": "".join(labels), "corners_px": geometry.corners_px.tolist(),
-                   "frame_size": list(geometry.frame_size), "source": source}, f)
+                   "inner_px": None if geometry.inner_px is None else geometry.inner_px.tolist(),
+                   "frame_size": list(geometry.frame_size), "source": source,
+                   "camera": camera or "front", "group": stamp}, f)
     return stamp
+
+
+def sample_camera(name):
+    """Camera of a stored sample from its file name."""
+    return name.rsplit("_", 1)[1] if "_" in name else "front"
 
 
 def load_samples(data_dir=config.DATA_DIR):
@@ -128,4 +161,5 @@ def load_samples(data_dir=config.DATA_DIR):
         if img is None:
             continue
         yield os.path.basename(js[:-5]), img, \
-            BoardGeometry(d["corners_px"], tuple(d["frame_size"])), list(d["labels"])
+            BoardGeometry(d["corners_px"], tuple(d["frame_size"]), inner_px=d.get("inner_px")), \
+            list(d["labels"])

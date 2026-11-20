@@ -1,11 +1,12 @@
 {
-  "limits": {
-    "J5": [
-      -99.63,
-      106.68
-    ]
-  },
-  "J5_zeroed": "2026-11-16 19:19:42",
-  "saved": "2026-11-16 19:22:46",
-  "margin_deg": 2.0
+ "limits": {
+  "J5": [
+   -99.63,
+   106.68
+  ]
+ },
+ "J5_zeroed": "2026-11-19 18:59:04",
+ "saved": "2026-11-17 20:32:41",
+ "margin_deg": 2.0,
+ "note": "J1-J4,J6 Annin auto-cal (J5 excluded) 2026-11-19 18:57 after a power loss; J5 zeroed by eye in manual_calib 18:59:04. J5 limits unchanged from 2026-11-17."
 }

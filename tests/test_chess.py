@@ -172,6 +172,7 @@ def robot(tmp_path):
 def test_square_mapping(robot, monkeypatch):
     monkeypatch.setattr(config, "RANK_OFFSET_MM", {})   # pure corner interpolation
     monkeypatch.setattr(config, "SQUARE_OFFSET_MM", {})
+    monkeypatch.setattr(config, "AIM_CORRECTION", False)  # measured map of the real arm, not this test board
     assert robot.square_xyz(chess.A1) == pytest.approx((250, 140, 100))
     assert robot.square_xyz(chess.H8) == pytest.approx((530, -140, 100))
     x, y, z = robot.square_xyz(chess.E4)
@@ -214,16 +215,114 @@ def test_plan_castling():
     assert kinds(ops) == [("pick", "e1"), ("place", "g1"), ("pick", "h1"), ("place", "f1")]
 
 
-def test_plan_promotion_uses_reserve_or_tray():
+def test_promotion_without_tray_piece_keeps_pawn_as_standin():
+    g = Game("4k3/8/8/8/8/8/1p6/4K3 b - - 0 1")
+    ops = plan_move(g, g.parse_move("b2b1q"))
+    assert kinds(ops) == [("pick", "b2"), ("place", "b1")]       # no swap
+    assert ops[0].piece == "p"                                     # gripped as a pawn
+    g.push(g.parse_move("b2b1q"))
+    assert g.board.piece_at(chess.B1).symbol() == "q"              # it IS a queen in the game
+    assert g.standins == {chess.B1: "p"} and g.tray == []
+    assert g.physical_labels()[chess.B1] == "p"                    # cameras expect a pawn
+    g.push(g.parse_move("e1e2"))
+    ops = plan_move(g, g.parse_move("b1h7"))                       # moves as a queen
+    assert ops[0].piece == "p"                                     # still gripped as a pawn
+    after = Game(g.board.fen())
+    after.standins = dict(g.standins)
+    after.push(after.parse_move("b1h7"))
+    inf = g.infer_move(fake_logp(after.physical_labels()))         # vision sees a pawn move b1->h7
+    assert inf["move"] == chess.Move.from_uci("b1h7")
+    g.push(g.parse_move("b1h7"))
+    assert g.standins == {chess.H7: "p"}
+    # a captured stand-in goes to the tray as a pawn; undo restores it
+    g2 = Game("4k3/8/8/8/8/8/1p6/R3K3 b - - 0 1")
+    g2.push(g2.parse_move("b2b1q"))
+    ops = plan_move(g2, g2.parse_move("a1b1"))
+    assert kinds(ops)[:2] == [("pick", "b1"), ("place", "tray:0")] and ops[0].piece == "p"
+    g2.push(g2.parse_move("a1b1"))
+    assert g2.tray == ["p"] and g2.standins == {}
+    g2.undo()
+    assert g2.standins == {chess.B1: "p"} and g2.tray == []
+
+
+def test_plan_promotion_swaps_from_tray():
     g = Game("4k3/1P6/8/8/8/8/8/4K3 w - - 0 1")
-    ops = plan_move(g, g.parse_move("b7b8q"))
-    assert kinds(ops) == [("pick", "b7"), ("place", "tray:0"), ("pick", "reserve"), ("place", "b8")]
     g.tray = ["N"]                              # a captured white knight is available
     ops = plan_move(g, g.parse_move("b7b8n"))
-    assert ("pick", "tray:0") in kinds(ops)
-    g.tray = []
-    ops = plan_move(g, g.parse_move("b7b8r"))   # no spare rook anywhere -> operator
-    assert ops[-1].kind == "pause"
+    assert kinds(ops) == [("pick", "b7"), ("place", "tray:1"), ("pick", "tray:0"), ("place", "b8")]
+    g.push(g.parse_move("b7b8n"))
+    assert g.tray == [None, "P"] and g.standins == {}
+
+
+def test_promotion_swaps_captured_queen_back_and_tracks_tray():
+    # Black's queen was captured earlier (tray slot 0); Black then promotes on a1.
+    g = Game("4k3/8/8/8/8/8/p7/4K2R b - - 0 1")
+    g.tray = ["q", "P"]
+    ops = plan_move(g, g.parse_move("a2a1q"))
+    assert kinds(ops) == [("pick", "a2"), ("place", "tray:2"), ("pick", "tray:0"), ("place", "a1")]
+    g.push(g.parse_move("a2a1q"))
+    assert g.tray == [None, "P", "p"] and g.standins == {}      # queen out, pawn in
+    g.push(g.parse_move("e1e2"))
+    ops = plan_move(g, g.parse_move("a1h1"))     # next capture fills the emptied slot 0
+    assert kinds(ops)[:2] == [("pick", "h1"), ("place", "tray:0")]
+    g.push(g.parse_move("a1h1"))
+    assert g.tray == ["R", "P", "p"]
+    g.undo()
+    g.undo()
+    g.undo()
+    assert g.tray == ["q", "P"]                  # undo restores everything
+
+
+def test_capture_promotion_with_no_queen_in_tray():
+    g = Game("1n2k3/P7/8/8/8/8/8/R3K3 w - - 0 1")
+    ops = plan_move(g, g.parse_move("a7b8q"))    # captures a knight while promoting
+    assert kinds(ops) == [("pick", "b8"), ("place", "tray:0"), ("pick", "a7"), ("place", "b8")]
+    g.push(g.parse_move("a7b8q"))
+    assert g.tray == ["n"] and g.standins == {chess.B8: "P"}
+
+
+def test_tilted_carry_gets_a_stop_midway():
+    from planner import add_regrips
+
+    class FakeBR:                       # 50 mm squares, board Z 100
+        def square_xyz(self, sq):
+            return (500.0 - 50 * chess.square_rank(sq), 50.0 * chess.square_file(sq), 100.0)
+
+    def located(ops):
+        for o in ops:
+            o.xyz = FakeBR().square_xyz(chess.parse_square(o.where))
+        return ops
+    g = Game("r3k3/8/8/8/8/8/8/4K3 b - - 0 1")
+    ops = add_regrips(located(plan_move(g, g.parse_move("a8a1"))), g, FakeBR(),
+                      reach=lambda xyz, p, tilt, place: True)
+    assert [(o.kind, o.where) for o in ops] == [("pick", "a8"), ("place", "a4"), ("pick", "a4"), ("place", "a1")]
+    ops = add_regrips(located(plan_move(g, g.parse_move("a8a5"))), g, FakeBR(),
+                      reach=lambda xyz, p, tilt, place: True)
+    assert len(ops) == 2                 # reachable tilted, not rank 1-2: no stop
+    g = Game("r3k3/8/8/8/8/8/8/4K3 b - - 0 1")
+    ops = add_regrips(located(plan_move(g, g.parse_move("a8a5"))), g, FakeBR(),
+                      reach=lambda xyz, p, tilt, place: tilt == 0 or xyz[0] < 280)   # a5 (X 300) not tilted
+    assert [(o.kind, o.where) for o in ops][1:3] in ([("place", "a6"), ("pick", "a6")], [("place", "a7"), ("pick", "a7")])
+
+
+def test_moves_to_rank8_stop_only_from_ranks_1_2():
+    from planner import add_regrips
+
+    class FakeBR:
+        def square_xyz(self, sq):
+            return (500.0 - 50 * chess.square_rank(sq), 50.0 * chess.square_file(sq), 100.0)
+
+    def run(fen, uci):
+        g = Game(fen)
+        ops = plan_move(g, g.parse_move(uci))
+        for o in ops:
+            o.xyz = FakeBR().square_xyz(chess.parse_square(o.where))
+        return add_regrips(ops, g, FakeBR(), reach=lambda xyz, p, tilt, place: True)
+    ops = run("4k3/8/8/8/8/8/8/R3K3 w - - 0 1", "a1a8")       # rank 1 -> 8: stop midway
+    assert [(o.kind, o.where, o.tilt) for o in ops] == [
+        ("pick", "a1", None), ("place", "a4", None), ("pick", "a4", 30.0), ("place", "a8", None)]
+    ops = run("4k3/8/8/8/R7/8/8/4K3 w - - 0 1", "a4a8")       # rank 4 -> 8: picked tilted, no stop
+    assert [(o.kind, o.where, o.tilt) for o in ops] == [("pick", "a4", 30.0), ("place", "a8", None)]
 
 
 def test_plan_rejects_illegal():

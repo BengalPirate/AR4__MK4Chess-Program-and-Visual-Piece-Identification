@@ -85,8 +85,9 @@ class WebcamSource:
     square crops. Repeated `repeat` times per epoch with mild augmentation (they are
     already at webcam resolution), so they outweigh the phone photos."""
 
-    def __init__(self, data_dir=config.DATA_DIR, repeat=3):
+    def __init__(self, data_dir=config.DATA_DIR, repeat=3, mirror_pieces=False):
         self.crops, self.labels, self.repeat = [], [], repeat
+        self.mirror_pieces = mirror_pieces    # flip piece crops too (a mirrored piece is the same piece)
         self.boards = 0
         for _, img, geo, labels in load_samples(data_dir):
             self.crops += geo.crops(img)
@@ -99,8 +100,8 @@ class WebcamSource:
             for c, l in zip(self.crops, self.labels):
                 f = c.astype(np.float32) * rng.uniform(0.85, 1.15) + rng.uniform(-12, 12)
                 c = np.clip(f, 0, 255).astype(np.uint8)
-                if l in ".":                       # empty squares: mirror freely
-                    c = cv2.flip(c, 1) if rng.random() < 0.5 else c
+                if (l == "." or self.mirror_pieces) and rng.random() < 0.5:
+                    c = cv2.flip(c, 1)
                 crops.append(c)
                 labels.append(LABELS.index(l))
         return crops, np.array(labels, dtype=np.int64)
@@ -120,6 +121,9 @@ def main():
     ap.add_argument("--epochs", type=int, default=10)
     ap.add_argument("--init", help="start from this saved model (e.g. models/piece_cnn.pt) instead of ImageNet")
     ap.add_argument("--lr", type=float, default=1e-3, help="peak learning rate (use ~3e-4 with --init)")
+    ap.add_argument("--mirror", action="store_true", help="also mirror piece crops of the webcam boards")
+    ap.add_argument("--out", default=CNN_FILE, help="model file to write (default: the one the demo uses)")
+    ap.add_argument("--tag", default="cnn", help="results/accuracy_<tag>.md and confusion_<tag>_*.png")
     a = ap.parse_args()
     torch.set_num_threads(os.cpu_count() or 1)
     torch.manual_seed(SEED)
@@ -130,7 +134,7 @@ def main():
     src = {k: Source(v, boxes, rng) for k, v in sets.items()}
     va_c, va_y = src["val"].sample(rng, False, 1)
     te_c, te_y = src["test"].sample(rng, False, 1)
-    web_train = WebcamSource()
+    web_train = WebcamSource(mirror_pieces=a.mirror)
     print(f"loaded in {time.time() - t0:.0f}s; val {len(va_y)} test {len(te_y)} crops; "
           f"{web_train.boards} webcam training boards", flush=True)
     net = make_net()
@@ -169,14 +173,14 @@ def main():
     os.makedirs(config.MODEL_DIR, exist_ok=True)
     torch.save({"state_dict": best[1], "labels": LABELS, "crop_size": config.CROP_SIZE,
                 "trained": time.strftime("%Y-%m-%d %H:%M"), "val_acc": best[0],
-                "photos": len(sets["train"]), "boards": web_train.boards}, CNN_FILE)
+                "photos": len(sets["train"]), "boards": web_train.boards, "mirror": a.mirror}, a.out)
     L = np.array(LABELS)
     out = [f"# Piece recognition accuracy (fine-tuned ResNet-18)\n\nGenerated {time.strftime('%Y-%m-%d %H:%M')}; "
            f"best validation accuracy {best[0]:.1%}; {a.epochs} epochs.\n"]
     txt, cm = report(L[te_y], L[evaluate(net, te_c, te_y)], "Held-out phone photos (test split)")
     out.append(txt)
     print(txt)
-    save_confusion(cm, os.path.join(config.RESULTS_DIR, "confusion_cnn_photos.png"))
+    save_confusion(cm, os.path.join(config.RESULTS_DIR, f"confusion_{a.tag}_photos.png"))
     web = list(load_samples(WEBCAM_TEST_DIR))
     if web:
         crops, y = [], []
@@ -187,10 +191,10 @@ def main():
         txt, cm = report(L[yi], L[evaluate(net, crops, yi)], f"Webcam boards ({len(web)}, never trained on)")
         out.append(txt)
         print(txt)
-        save_confusion(cm, os.path.join(config.RESULTS_DIR, "confusion_cnn_webcam.png"))
-    with open(os.path.join(config.RESULTS_DIR, "accuracy_cnn.md"), "w") as f:
+        save_confusion(cm, os.path.join(config.RESULTS_DIR, f"confusion_{a.tag}_webcam.png"))
+    with open(os.path.join(config.RESULTS_DIR, f"accuracy_{a.tag}.md"), "w") as f:
         f.write("\n".join(out))
-    print(f"saved {CNN_FILE} ({time.time() - t0:.0f}s)")
+    print(f"saved {a.out} ({time.time() - t0:.0f}s)")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,85 @@
+{
+ "pieces": [
+  {
+   "square": "e3",
+   "piece": "r",
+   "colour": "black",
+   "direction": "h",
+   "mm": 10.0,
+   "dx_mm": 10.0,
+   "dy_mm": 0.0
+  },
+  {
+   "square": "g5",
+   "piece": "N",
+   "colour": "white",
+   "direction": "1",
+   "mm": 10.0,
+   "dx_mm": 0.0,
+   "dy_mm": -10.0
+  },
+  {
+   "square": "b2",
+   "piece": "b",
+   "colour": "black",
+   "direction": "8",
+   "mm": 5.0,
+   "dx_mm": 0.0,
+   "dy_mm": 5.0
+  },
+  {
+   "square": "c6",
+   "piece": "K",
+   "colour": "white",
+   "direction": "8",
+   "mm": 10.0,
+   "dx_mm": 0.0,
+   "dy_mm": 10.0
+  },
+  {
+   "square": "f5",
+   "piece": "p",
+   "colour": "black",
+   "direction": "a",
+   "mm": 5.0,
+   "dx_mm": -5.0,
+   "dy_mm": 0.0
+  },
+  {
+   "square": "h7",
+   "piece": "Q",
+   "colour": "white",
+   "direction": "none",
+   "mm": 0.0,
+   "dx_mm": 0.0,
+   "dy_mm": 0.0
+  },
+  {
+   "square": "a1",
+   "piece": "P",
+   "colour": "white",
+   "direction": "h",
+   "mm": 10.0,
+   "dx_mm": 10.0,
+   "dy_mm": 0.0
+  },
+  {
+   "square": "d8",
+   "piece": "q",
+   "colour": "black",
+   "direction": "1",
+   "mm": 5.0,
+   "dx_mm": 0.0,
+   "dy_mm": -5.0
+  }
+ ],
+ "cameras": [
+  "front",
+  "side"
+ ],
+ "note": "offset_capture.py",
+ "calibration": {
+  "front": "/home/parallels/AR4/team2_chess/config/board_image.json",
+  "side": "/home/parallels/AR4/team2_chess/config/board_image_side.json"
+ }
+}

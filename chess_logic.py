@@ -125,7 +125,107 @@ class Game:
 
     def __init__(self, fen=chess.STARTING_FEN):
         self.board = chess.Board(fen)
-        self.tray = []          # captured piece symbols in slot order (index = slot)
+        # Off-board pieces, by tray slot: a FEN letter, or None for a slot emptied
+        # when a piece was taken back out for a promotion. The robot puts every
+        # piece in, so this list says exactly where each one is.
+        self.tray = []
+        self.reserve_used = False   # the spare piece on the reserve spot has been used
+        # Stand-ins: square -> the pawn physically standing there for a promoted
+        # piece (promotion with no matching piece in the tray: the pawn stays and
+        # both players treat it as the new piece). Vision expects the pawn there,
+        # the robot grips it as a pawn, and a captured stand-in goes to the tray as a pawn.
+        self.standins = {}
+        self._history = []          # (tray, reserve_used, standins) before each move, for undo
+
+    # ---- tray
+    def free_slots(self, n, tray=None):
+        """The first n empty tray slots (gaps left by promotions are reused first)."""
+        tray = self.tray if tray is None else tray
+        out = [i for i, s in enumerate(tray) if s is None][:n]
+        k = len(tray)
+        while len(out) < n:
+            out.append(k)
+            k += 1
+        return out
+
+    def promotion_source(self, symbol, tray=None):
+        """Where the promotion piece comes from: ("tray", slot) holding that exact
+        piece (type and colour) -> it is swapped onto the board; else ("reserve", None)
+        if a spare is configured (config.RESERVE_PIECE) and unused; else (None, None)
+        -> no swap: the pawn stays on the board as a stand-in for the new piece."""
+        tray = self.tray if tray is None else tray
+        for i, s in enumerate(tray):
+            if s == symbol:
+                return "tray", i
+        if config.RESERVE_PIECE and symbol == config.RESERVE_PIECE and not self.reserve_used:
+            return "reserve", None
+        return None, None
+
+    def physical(self, sq, board=None, standins=None):
+        """FEN letter of the piece physically on sq (a stand-in pawn, or the real piece)."""
+        st = self.standins if standins is None else standins
+        if sq in st:
+            return st[sq]
+        pc = (board or self.board).piece_at(sq)
+        return pc.symbol() if pc else None
+
+    def physical_labels(self, board=None, standins=None):
+        """What the cameras should see: square_labels with stand-in pawns."""
+        out = square_labels(board or self.board)
+        for sq, pawn in (self.standins if standins is None else standins).items():
+            out[sq] = pawn
+        return out
+
+    def standins_after(self, m):
+        st = dict(self.standins)
+        cap = self.captured_square(m)
+        if cap is not None:
+            st.pop(cap, None)
+        if m.from_square in st:
+            st[m.to_square] = st.pop(m.from_square)
+        if m.promotion:
+            new = chess.Piece(m.promotion, self.board.turn).symbol()
+            if self.promotion_source(new, self.tray_after(m, _skip_promo=True)[0])[0] is None:
+                st[m.to_square] = self.board.piece_at(m.from_square).symbol()
+        return st
+
+    def tray_after(self, m, _skip_promo=False):
+        """(tray, reserve_used, steps) after move m, steps describing each tray change:
+        [("in", slot, piece) | ("out", slot or "reserve", piece)]. Shared by the robot
+        plan and the game state so the two can never disagree."""
+        b = self.board
+        tray, used, steps = list(self.tray), self.reserve_used, []
+        cap = self.captured_square(m)
+        if cap is not None:
+            slot = self.free_slots(1, tray)[0]
+            sym = self.physical(cap)                    # a captured stand-in is a pawn
+            tray += [None] * (slot + 1 - len(tray))
+            tray[slot] = sym
+            steps.append(("in", slot, sym))
+        if m.promotion and not _skip_promo:
+            pawn = b.piece_at(m.from_square).symbol()
+            new = chess.Piece(m.promotion, b.turn).symbol()
+            src, slot_out = self.promotion_source(new, tray)
+            if src is None:                 # no swap: the pawn stays as a stand-in
+                return tray, used, steps
+            slot = self.free_slots(1, tray)[0]
+            tray += [None] * (slot + 1 - len(tray))
+            tray[slot] = pawn
+            steps.append(("in", slot, pawn))
+            if src == "tray":
+                tray[slot_out] = None
+                steps.append(("out", slot_out, new))
+            else:
+                used = True
+                steps.append(("out", "reserve", new))
+        return tray, used, steps
+
+    def tray_text(self):
+        return " ".join(f"{i}:{s}" for i, s in enumerate(self.tray) if s) or "-"
+
+    def standin_text(self):
+        return " ".join(f"{chess.square_name(sq)}={self.board.piece_at(sq).symbol()}(pawn)"
+                        for sq in sorted(self.standins) if self.board.piece_at(sq)) or "-"
 
     # ---- moves
     def parse_move(self, text):
@@ -166,17 +266,18 @@ class Game:
         b = self.board
         if m not in b.legal_moves:
             raise ValueError(self.why_illegal(m))
-        cap = self.captured_square(m)
-        if cap is not None:
-            self.tray.append(b.piece_at(cap).symbol())
+        tray, used, _ = self.tray_after(m)
+        st = self.standins_after(m)
+        self._history.append((list(self.tray), self.reserve_used, dict(self.standins)))
+        self.tray, self.reserve_used, self.standins = tray, used, st
         b.push(m)
 
     def undo(self):
         if not self.board.move_stack:
             return None
         m = self.board.pop()
-        if self.captured_square(m) is not None:
-            self.tray.pop()
+        if self._history:
+            self.tray, self.reserve_used, self.standins = self._history.pop()
         return m
 
     def captured_square(self, m, board=None):
@@ -220,10 +321,11 @@ class Game:
         is None for 'no move'. The caller pauses for correction when the margin to
         the runner-up is small or some square strongly disagrees (surprise)."""
         b = self.board
-        hyps = [(None, square_labels(b))]
-        for m in b.legal_moves:
+        hyps = [(None, self.physical_labels())]
+        for m in list(b.legal_moves):
+            st = self.standins_after(m)          # what is physically where after m
             b.push(m)
-            hyps.append((m, square_labels(b)))
+            hyps.append((m, self.physical_labels(b, st)))
             b.pop()
         scored = []
         for m, labels in hyps:
