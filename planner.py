@@ -202,9 +202,47 @@ def _stop_square(br, occupied, dest_sq, src_xy, op, reach, place_tilt, pick_tilt
     return None if best is None else best[1:]
 
 
+def robot_sq(sq):
+    """Chess square index -> robot/camera square index (config.CHESS_FILES_MIRRORED)."""
+    return sq ^ 7 if config.CHESS_FILES_MIRRORED else sq
+
+
+def robot_name(where):
+    """Chess square name in an Op -> the robot's name for it (tray slots unchanged)."""
+    if len(where) == 2 and where[0] in "abcdefgh" and where[1] in "12345678":
+        return chess.square_name(robot_sq(chess.parse_square(where)))
+    return where
+
+
+class _Occupancy:
+    """Stand-in for a Game in add_regrips: only .board.piece_at is used, in robot squares."""
+    def __init__(self, board):
+        self.board = board.transform(chess.flip_horizontal) if config.CHESS_FILES_MIRRORED else board
+
+
+def to_robot(ops, board, br):
+    """Chess-square ops -> located robot ops with the midway stops (board: the
+    physical position, chess squares, before the ops run)."""
+    for o in ops:
+        o.where = robot_name(o.where)
+    return add_regrips([br.locate(o) for o in ops], _Occupancy(board), br)
+
+
 def plan_robot_move(game, move, br):
-    """plan_move, located on the robot, with the midway stops add_regrips needs."""
-    return add_regrips([br.locate(o) for o in plan_move(game, move)], game, br)
+    """plan_move, located on the robot (files mirrored for the game), with the
+    midway stops add_regrips needs."""
+    return to_robot(plan_move(game, move), game.board, br)
+
+
+def plan_restore(board, frm, to, piece, br):
+    """Undo an illegal move the player made by hand: the piece standing on `to`
+    goes back to `frm` (chess squares). board: the game position (piece still on frm)."""
+    phys = board.copy()
+    pc = phys.remove_piece_at(frm)
+    phys.set_piece_at(to, pc)
+    ops = [Op("pick", chess.square_name(to), piece, "illegal move: taking it back"),
+           Op("place", chess.square_name(frm), piece, "illegal move: back to its square")]
+    return to_robot(ops, phys, br)
 
 
 class BoardRobot:

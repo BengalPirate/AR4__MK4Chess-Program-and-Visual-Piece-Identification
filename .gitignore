@@ -23,3 +23,5 @@ results/rod_calib_*_raw_*.jpg
 # identical copy of models/piece_cnn.pt / superseded front-camera-only model
 models/piece_cnn_2cam.pt
 models/piece_cnn_front_only_20261117.pt
+# live-game logs are report evidence
+!results/games/*.log

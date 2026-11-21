@@ -45,7 +45,10 @@ MOVE_MIN_MARGIN = 2.0               # log-likelihood margin best vs 2nd-best mov
 MOVE_MAX_SQUARE_SURPRISE = 4.0      # -log p of any square under the chosen hypothesis
 
 # ---------------------------------------------------------------- chess engine
-STOCKFISH_PATHS = ("/usr/games/stockfish", "/usr/bin/stockfish", "/usr/local/bin/stockfish")
+STOCKFISH_PATHS = (os.path.expanduser("~/AR4/tools/stockfish_pkg/root/usr/games/stockfish"),   # unpacked .deb (no sudo)
+                   "/usr/games/stockfish", "/usr/bin/stockfish", "/usr/local/bin/stockfish")
+STOCKFISH_SKILL = 20                # 0 (weak) .. 20 (full strength); chess_demo --skill overrides
+AUTO_SCAN_S = 1.5                   # --auto: seconds between scans while waiting for the player
 ENGINE_TIME_S = 0.5
 FALLBACK_DEPTH = 3
 
@@ -58,7 +61,10 @@ J5_WINDOW = (-97.6, 104.7)        # deg; 0 = gripper in line with the forearm. M
 # J6 may turn: the jaws are held at one direction relative to the board. 45 deg
 # to the files opens them toward the diagonal neighbours (1.4 squares away).
 GRIPPER_YAW_DEG = 45.0              # jaw direction offset (set by eye in board_teach.py)
-SPEED_PCT = 10                      # reduced speed for all testing (ar4link caps at 25)
+SPEED_PCT = 30                      # descents/lifts at the piece (2026-11-20: 10 -> 30, operator "3x"; ar4link caps at 75)
+# 2026-11-20 operator: faster game. Travel at travel height (square to square, stepping
+# aside to look, park) runs at this; the straight descents/lifts at the piece stay at SPEED_PCT.
+TRAVEL_SPEED_PCT = 50              # 2026-11-20: 25 -> 50, ramping toward 75 if moves land cleanly
 TOOL_LENGTH_MM = 64.0               # J6 flange -> closed jaw tips: user measured 105 from the J5 hinge; model J5 axis -> flange = 41
 MAX_TILT_DEG = 60.0                 # squares unreachable straight down (b8-g8: J3 would pass +52) are
                                     # approached with the gripper tilted in the arm's vertical plane
@@ -67,6 +73,13 @@ RANK8_TILT_DEG = 30.0              # rank 8 is always worked tilted back this mu
 # square midway and picked up again straight down before going to ranks 1-2, or
 # wherever the tilted pose would bring J5 within this margin of its window.
 REGRIP_RANKS = (1, 2)
+# The robot/camera square names (a1, h8 ... as taught) have the a-file on the
+# robot's RIGHT. A chess player sitting where the robot is has the a-file on the
+# LEFT, so for a real game chess files are mirrored onto robot files
+# (chess e1 = robot d1: white king on robot d1, queen on robot e1). Ranks are the same.
+# Used only by the game (chess_demo.py / planner.plan_robot_move); robot and camera
+# code keep the robot's square names.
+CHESS_FILES_MIRRORED = False   # 2026-11-20: pieces set up standard (K e1, Q d1); set True only for a mirrored setup
 TILT_J5_MARGIN_DEG = 10.0
 # Missed grip (cameras still see the piece on its square after the lift): retry
 # shifted this far along the a-h direction, first in GRIP_RETRY_FIRST (+1 = toward
@@ -81,12 +94,16 @@ OFFSET_CORRECTION = True
 # where it really stands and set it down shifted the other way by that much, up to
 # PLACE_FIX_TRIES times (operator's request 2026-11-19).
 PLACE_CHECK = True
-PLACE_TOL_MM = 4.0
+PLACE_TOL_MM = 6.0                  # 2026-11-20 operator: 4 -> 6 (4 mm ~ offset-model noise; fixes chased noise, re-picks risk a tip-over or a hard squeeze)
 PLACE_FIX_TRIES = 2
 PLACE_ASIDE_SQ = 1.5          # step this many squares aside (toward the robot; ranks 7-8: toward rank 1) to look
 GRIP_RETRY_MM = 5.0
 GRIP_RETRIES = 2
 GRIP_RETRY_FIRST = +1
+# Rank 8 (tilted picks): after two misses the THIRD try aims this far TOWARD THE ROBOT
+# (toward the rank-8 edge), from the camera-corrected aim. Operator 2026-11-20: tilted
+# rank-8 picks kept failing because the jaws met the piece too far toward rank 1.
+RANK8_THIRD_TRY_BACK_MM = 15.0
 TRAVEL_CLEARANCE = 15               # gap kept above the tallest piece during transit
 APPROACH_Z = 40                     # above the piece top before the slow descent
 VERTICAL_STEP_MM = 15               # (no longer used for splitting: _vertical is one move, split by PATH_TOL_MM)

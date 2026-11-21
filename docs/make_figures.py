@@ -28,16 +28,17 @@ DOCS = os.path.join(ROOT, "docs")
 
 def system_diagram():
     boxes = [
-        ("Webcam\nLogitech C930e, 1280×720", "#dfe9f5"),
-        ("board_vision.py\ncalibrated camera model → 64 upright square crops", "#dfe9f5"),
-        ("pieces.py\nfine-tuned ResNet-18: 13 probabilities per square\n(empty, P N B R Q K, p n b r q k)", "#dfe9f5"),
-        ("chess_logic.py  (python-chess)\ngame state: turn, castling / en passant rights, tray\n"
-         "legal-move inference with margin check → accept or PAUSE", "#e6f2e1"),
-        ("Move selection\nengine (Stockfish or built-in) or operator; illegal moves rejected", "#e6f2e1"),
-        ("planner.py\nmove → pick / place on squares, tray slots, reserve\n(captures, en passant, castling, promotion)", "#fbefd9"),
-        ("motion.py + kin.py\npreflight of every point, vertical approach / retreat,\n"
-         "rank-8 tilt, J5 window, one-arm interlock", "#fbefd9"),
-        ("ar4link.py → AR4 MK4 (Teensy, firmware 6.7.1)\ngripper.py → servo gripper (Nano)", "#f6dede"),
+        ("cameras.py: two webcams, 1280×720 @ 15 fps\nfront C930e (behind White) + side C920 PRO (a-file side)", "#dfe9f5"),
+        ("board_vision.py\nper-camera model fitted to the tiles → 64 square crops; bump check", "#dfe9f5"),
+        ("pieces.py / offset_model.py\nfine-tuned ResNet-18 per view, fused: 13 probabilities per square;\n"
+         "piece offset from the square centre (mm)", "#dfe9f5"),
+        ("chess_logic.py  (python-chess 1.11)\ngame state: turn, castling / en passant rights, tray, stand-ins\n"
+         "legal-move inference, 2 agreeing scans → accept, else PAUSE", "#e6f2e1"),
+        ("Move selection\nStockfish 16 over UCI (robot's side) / player's move seen by the cameras", "#e6f2e1"),
+        ("planner.py\nmove → pick / place on squares and tray slots\n(captures, en passant, castling, promotion, set-down stops)", "#fbefd9"),
+        ("motion.py + kin.py\npreflight, vertical approach / retreat, rank-8 tilt, backlash approach,\n"
+         "pick check (cameras + gripper current), placement check + fix, interlock", "#fbefd9"),
+        ("ar4link.py → AR4 MK4 (Teensy, firmware 6.7.1)\ngripper.py → servo gripper (Nano, current sensor)", "#f6dede"),
     ]
     fig, ax = plt.subplots(figsize=(7.5, 9.2))
     ax.set_xlim(0, 10)
@@ -51,9 +52,9 @@ def system_diagram():
         if i:
             ax.annotate("", xy=(5, y + 0.97), xytext=(5, y + 1.23),
                         arrowprops=dict(arrowstyle="-|>", color="#333", lw=1.2))
-    ax.text(9.75, 4.8, "perception", rotation=90, va="center", color="#2b5d99", fontsize=9)
-    ax.text(9.75, 2.6, "chess logic", rotation=90, va="center", color="#3d7a2e", fontsize=9)
-    ax.text(9.75, 0.9, "motion", rotation=90, va="center", color="#99661a", fontsize=9)
+    ax.text(9.75, 8.2, "perception", rotation=90, va="center", color="#2b5d99", fontsize=9)
+    ax.text(9.75, 5.0, "chess logic", rotation=90, va="center", color="#3d7a2e", fontsize=9)
+    ax.text(9.75, 1.9, "motion", rotation=90, va="center", color="#99661a", fontsize=9)
     fig.tight_layout()
     fig.savefig(os.path.join(DOCS, "system_diagram.png"), dpi=170)
     plt.close(fig)

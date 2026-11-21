@@ -102,9 +102,10 @@ class Engine:
         if path:
             try:
                 self.sf = chess.engine.SimpleEngine.popen_uci(path)
+                self.sf.configure({"Skill Level": int(config.STOCKFISH_SKILL)})
             except Exception as e:      # noqa: BLE001 - fall back on any engine failure
                 print(f"Stockfish failed to start ({e}); using built-in engine")
-        self.name = f"Stockfish ({path})" if self.sf else \
+        self.name = f"Stockfish skill {config.STOCKFISH_SKILL}" if self.sf else \
             f"built-in alpha-beta, depth {config.FALLBACK_DEPTH}"
 
     def choose(self, board):

@@ -2,6 +2,11 @@
 
 Run:  python chess_demo.py            camera + chess, robot plan shown but not executed
       python chess_demo.py --robot    also connect the AR4 and gripper (X executes)
+      python chess_demo.py --robot --auto --from-board --robot-color black
+                                      real game, hands-free: the game starts from the board as
+                                      the cameras see it; your move is accepted once two scans
+                                      agree and the robot replies at once (Stockfish, --skill
+                                      0-20); an illegal move is put back. TAB pauses/resumes.
 
 Keys (camera window). Moves are typed in UCI (e2e4, e7e8q) and sent with ENTER,
 so letters a-h, 1-8 and q r b n are kept for typing:
@@ -44,7 +49,7 @@ import config
 from board_vision import BoardGeometry, detect_markers, refine_corners_empty_board
 from cameras import open_views
 from chess_logic import LABELS, Engine, Game, board_from_labels
-from planner import BoardRobot, plan_move, plan_robot_move
+from planner import BoardRobot, plan_move, plan_restore, plan_robot_move, robot_sq
 
 VW, VH = 720, 405                       # displayed size of each camera view
 H_CAM = VH
@@ -73,6 +78,9 @@ class App:
         self.views = open_views()           # every attached board camera (cameras.py)
         self.calib_view = None              # view being calibrated by clicks
         self.game = Game()
+        self.robot_color = chess.WHITE if args.robot_color == "white" else chess.BLACK
+        if getattr(args, "skill", None) is not None:
+            config.STOCKFISH_SKILL = args.skill
         self.engine = Engine()
         self.clf = self._load_classifier()
         self.msg, self.msg_col = "Ready. SPACE = scan, P = engine move, K = calibrate", WHITE
@@ -84,8 +92,17 @@ class App:
         self.verified = False       # last scan matched the game state
         self.selected = None        # square chosen for manual correction
         self.overrides = {}         # square -> label set by the operator
+        for item in filter(None, (getattr(args, "fix", None) or "").split(",")):
+            sq, lab = item.split("=")       # --fix f1=B,f7=p (start-position corrections)
+            self.overrides[chess.parse_square(sq.strip())] = lab.strip()
         self.live = False
         self.busy = False
+        # --auto: the game runs itself - scans while waiting, accepts the player's move once
+        # two scans in a row agree, and the robot replies at once. TAB pauses / resumes.
+        self.auto = bool(getattr(args, "auto", False))
+        self.auto_paused = False
+        self.started = not getattr(args, "from_board", False)   # --from-board: game set from the first scan
+        self._seen = None           # last scan's reading, for the two-scans-agree rule
         self.calib_clicks = None
         self.setup_idx = -1
         self.highlight = {}         # square -> colour (errors, move squares)
@@ -179,6 +196,10 @@ class App:
                     self.say("PAUSED: " + why, RED)
                     return
                 logp, per_view = scan_views(self.clf, [(v.key, v.geo, fr) for v, fr in grabbed])
+                # cameras index robot squares; the game uses chess squares (files mirrored)
+                idx = [robot_sq(sq) for sq in range(64)]
+                logp = np.asarray(logp)[idx].copy()
+                per_view = {k: np.asarray(lp)[idx] for k, lp in per_view.items()}
                 for sq, lab in self.overrides.items():          # operator corrections
                     logp[sq][:] = np.log(1e-6)
                     logp[sq][LABELS.index(lab)] = 0.0
@@ -212,6 +233,9 @@ class App:
         return [sq for sq in range(64) if len({v[sq] for v in vl}) > 1]
 
     def _interpret(self):
+        if not self.started:
+            self._start_from_board()
+            return
         s, g = self.scan, self.game
         inf = g.infer_move(s["logp"])
         s["inference"] = inf
@@ -219,19 +243,35 @@ class App:
         self.highlight = {}
         if inf["move"] is None and g.confident(inf):
             self.verified = True
+            self._seen = None
             errs = [sq for sq in range(64) if s["labels"][sq] != truth_now[sq]]
             for sq in errs:
                 self.highlight[sq] = AMBER
             self._log_scan(truth_now, "verify")
+            whose = ""
+            if self.auto and not g.board.is_game_over():
+                whose = " - robot's move" if g.board.turn == self.robot_color else " - YOUR move"
             self.say(f"Board matches the game ({len(errs)} square(s) misread but explained "
-                     f"by the game state). {g.status()}", GREEN)
+                     f"by the game state). {g.status()}{whose}", GREEN)
+            self._auto_robot_move()
             return
         self.verified = False
+        if inf["move"] is not None and g.confident(inf) and self.auto \
+                and g.board.turn != self.robot_color:
+            m = inf["move"]
+            if not self._agrees(("move", m.uci())):
+                self.say(f"Seen {g.board.san(m)} ({m.uci()}) - checking once more (hands clear)", CYAN)
+                return
+            self.accept_move(m, "vision")        # board verified by this scan
+            self._auto_robot_move()
+            return
         if inf["move"] is not None and g.confident(inf):
             self.pending = inf["move"]
             self.highlight = {inf["move"].from_square: CYAN, inf["move"].to_square: CYAN}
             self.say(f"Detected move {g.board.san(inf['move'])} ({inf['move'].uci()}), margin "
                      f"{inf['margin']:.1f}. ENTER = accept, ESC = reject", CYAN)
+            return
+        if self._illegal_move():
             return
         # Not confident: explain why and wait for the operator
         cands = ", ".join((m.uci() if m else "no move") for m, _ in inf["ranked"][:3])
@@ -243,6 +283,62 @@ class App:
         self.say(f"PAUSED - unsure (best: {cands}; {worst} disagrees). Type the move + ENTER, "
                  "or click squares to correct and SPACE again", RED)
         self._log_scan(None, "uncertain")
+
+    def _illegal_move(self):
+        """The player moved one piece to a square it may not go to (operator's rule
+        2026-11-20): the arm takes it back to its square and the game waits for a legal
+        move. Only a piece moved to an EMPTY square is taken back automatically - if an
+        illegal move also took or knocked another piece, the arm cannot know where that
+        piece belongs, so the game pauses for the operator. Returns True if handled."""
+        s, g = self.scan, self.game
+        truth, labels, conf = g.physical_labels(), s["labels"], s["conf"]
+        diff = [sq for sq in range(64) if labels[sq] != truth[sq]]
+        vacated = [sq for sq in diff if truth[sq] != "." and labels[sq] == "."]
+        appeared = [sq for sq in diff if truth[sq] == "." and labels[sq] != "."]
+        name = chess.square_name
+        if len(diff) == 2 and len(vacated) == 1 and len(diff) - len(vacated) == 1 and not appeared:
+            frm, to = vacated[0], next(sq for sq in diff if sq != vacated[0])
+            self.verified = False
+            self.highlight = {frm: RED, to: RED}
+            self.say(f"ILLEGAL: the {truth[frm]} from {name(frm)} seems to have taken the {truth[to]} on "
+                     f"{name(to)}. Put both pieces back by hand, then SPACE", RED)
+            return True
+        if not (len(diff) == 2 and len(vacated) == 1 and len(appeared) == 1):
+            return False
+        frm, to = vacated[0], appeared[0]
+        if min(conf[frm], conf[to]) < config.MIN_SQUARE_CONF:
+            return False                 # not sure enough of the reading to move anything
+        if any(m.from_square == frm and m.to_square == to for m in g.board.legal_moves):
+            return False                 # a legal move read uncertainly: the normal pause handles it
+        piece = truth[frm]               # the game knows what stood there (the reading may misname it)
+        if self.auto and not self._agrees(("illegal", frm, to)):
+            self.say(f"Looks like an illegal move {name(frm)}{name(to)} - checking once more", AMBER)
+            return True
+        why = g.why_illegal(chess.Move(frm, to))
+        self.verified = False
+        self.highlight = {frm: RED, to: RED}
+        if self.br is None:
+            self.say(f"ILLEGAL move {name(frm)}{name(to)} ({why}). Put the {piece} back on {name(frm)}, "
+                     "then make a legal move and SPACE", RED)
+            return True
+        ops = plan_restore(g.board, frm, to, piece, self.br)
+        print(f"\nIllegal move {name(frm)}{name(to)} ({why}) - taking it back:")
+        for o in ops:
+            print("   ", o)
+        if self.executor is None:
+            self.say(f"ILLEGAL move {name(frm)}{name(to)} ({why}). Dry run: put the {piece} back on "
+                     f"{name(frm)} by hand, then make a legal move and SPACE", RED)
+            return True
+        # runs on the scan thread, which keeps self.busy set until the arm is done
+        try:
+            self.say(f"ILLEGAL move {name(frm)}{name(to)} ({why}) - the arm puts the {piece} back "
+                     f"on {name(frm)}. Hands off the board (E-stop to stop)", RED)
+            self.executor.run(ops)
+            self.say(f"The {piece} is back on {name(frm)}. Make a LEGAL move, then SPACE "
+                     f"({why})", AMBER)
+        except Exception as e:      # noqa: BLE001
+            self.say(f"ROBOT STOPPED while taking the illegal move back: {e}", RED)
+        return True
 
     def _log_scan(self, truth, kind):
         s = self.scan
@@ -291,6 +387,9 @@ class App:
                     parts.append(f"take the {pc} from tray slot {slot}")
             tray_note = " TRAY: " + "; ".join(parts) + "."
         self.say(f"{san} played ({how}). {g.status()}{tray_note}", AMBER if tray_note else GREEN)
+        if self.args.play and not self.auto and how in ("vision", "typed") \
+                and g.board.turn == self.robot_color and not g.board.is_game_over() and not tray_note:
+            self.engine_move()          # --play: the robot's reply is planned at once; X executes
 
     def engine_move(self):
         g = self.game
@@ -332,18 +431,92 @@ class App:
 
         def work():
             try:
-                self.say(f"Robot executing {m.uci()} ... (SPACE-bar does not stop the arm: "
-                         "use the E-stop)", AMBER)
-                self.executor.run(ops)
-                self.accept_move(m, "robot")
-                self.verified = False
-                self.say(f"Robot played {m.uci()}. SPACE to verify the board", GREEN)
-            except Exception as e:      # noqa: BLE001
-                self.say(f"ROBOT STOPPED: {e}", RED)
+                self._execute_now(m, ops)
             finally:
                 self.busy = False
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _execute_now(self, m, ops):
+        """Run the robot's move on the calling (worker) thread. True if it was played."""
+        try:
+            self.say(f"Robot executing {self.game.board.san(m)} ({m.uci()}) ... (SPACE-bar does not "
+                     "stop the arm: use the E-stop)", AMBER)
+            self.executor.run(ops)
+            self.accept_move(m, "robot")
+            self.verified = False
+            self.say(f"Robot played {m.uci()}. " + ("Checking the board..." if self.auto
+                                                    else "SPACE to verify the board"), GREEN)
+            return True
+        except Exception as e:      # noqa: BLE001
+            if self.auto:
+                self.auto_paused = True
+            self.say(f"ROBOT STOPPED: {e}" + (" - AUTO PAUSED: fix the board, then TAB" if self.auto else ""),
+                     RED)
+            return False
+
+    def _agrees(self, key):
+        """--auto: act only when two scans in a row read the same thing (the player's
+        hand is out of the way and the reading is stable)."""
+        same = self._seen == key
+        self._seen = None if same else key
+        return same
+
+    def _auto_robot_move(self):
+        """--auto: the board is verified and it is the robot's turn - choose with the
+        engine and play it at once (on the scan thread, which holds self.busy)."""
+        g = self.game
+        if not self.auto or self.auto_paused or not self.verified or g.board.is_game_over() \
+                or g.board.turn != self.robot_color:
+            if self.auto and g.board.is_game_over():
+                self.say(f"GAME OVER: {g.status()}", CYAN)
+            return
+        self.engine_move()
+        if not self.plan:
+            return
+        m, ops = self.plan
+        if any(o.kind == "pause" for o in ops):
+            self.auto_paused = True
+            self.say(f"AUTO PAUSED: the plan for {m.uci()} needs the operator (see the panel). "
+                     "X executes it, TAB resumes auto", AMBER)
+            return
+        if self.executor is None:
+            self._simulate(m, ops)
+            return
+        self._execute_now(m, ops)
+
+    def _start_from_board(self):
+        """--from-board: the game starts from whatever the cameras see (no fixed
+        start position). The standard start is White to move; any other position is
+        taken as the player's move (--to-move robot changes that)."""
+        s = self.scan
+        unsure = [chess.square_name(sq) for sq in range(64) if s["conf"][sq] < config.MIN_SQUARE_CONF]
+        if unsure:
+            for sq in range(64):
+                if s["conf"][sq] < config.MIN_SQUARE_CONF:
+                    self.highlight[sq] = AMBER
+            self.say(f"Reading the start position: unsure of {', '.join(unsure[:6])} - hands clear? "
+                     "(click a square + type its piece to correct)", AMBER)
+            return
+        b = board_from_labels(s["labels"])
+        if b.board_fen() == chess.STARTING_BOARD_FEN:
+            b.turn = chess.WHITE
+        else:
+            robot = getattr(self.args, "to_move", "player") == "robot"
+            b.turn = self.robot_color if robot else (not self.robot_color)
+        if not b.is_valid():
+            self.say(f"The board as read is not a legal chess position ({b.status()!r}) - "
+                     "correct it (click a square + type its piece)", RED)
+            return
+        if not self._agrees(("start", b.fen())):
+            self.say("Start position read - checking once more", CYAN)
+            return
+        self.game, self.plan, self.pending, self.overrides = Game(b.fen()), None, None, {}
+        self.started, self.verified = True, True
+        side = "White" if b.turn == chess.WHITE else "Black"
+        self.say(f"Game set from the board: {b.board_fen()} - {side} to move "
+                 f"({'robot' if b.turn == self.robot_color else 'YOU'})", GREEN)
+        self._auto_robot_move()
 
     def _simulate(self, m, ops):
         """Dry run: compute every joint move of the plan without a robot."""
@@ -370,21 +543,34 @@ class App:
         self.accept_move(m, "simulated")
 
     # ------------------------------------------------------------ input
+    def _colour_like_cameras(self, sq, ch):
+        """The OpenCV window often loses Shift/Caps Lock (2026-11-20: 'B' arrived as 'b'),
+        so a lowercase piece letter takes the colour the cameras see on that square
+        (colour is read reliably; the piece type is what gets corrected). Uppercase is
+        always white; a square the cameras see as empty keeps the letter as typed."""
+        if ch.isupper() or not self.scan:
+            return ch
+        seen = [v[sq] for v in self.scan.get("view_labels", {}).values() if v[sq] != "."]
+        if seen and sum(c.isupper() for c in seen) * 2 > len(seen):
+            return ch.upper()
+        return ch
+
     def on_key(self, k):
         if k < 0:
             return True
         ch = chr(k) if k < 128 else ""
         if self.selected is not None and ch in "PNBRQKpnbrqk.0" and ch:
-            lab = "." if ch in ".0" else ch
+            lab = "." if ch in ".0" else self._colour_like_cameras(self.selected, ch)
             self.overrides[self.selected] = lab
             self.say(f"{chess.square_name(self.selected)} set to '{lab}'. SPACE to re-scan with "
                      f"{len(self.overrides)} correction(s)", CYAN)
             self.selected = None
             return True
         if k == 27:                         # ESC
+            n = len(self.overrides)
             self.typed, self.pending, self.pending_board, self.selected = "", None, None, None
-            self.calib_clicks = None
-            self.say("Cleared", WHITE)
+            self.calib_clicks, self.overrides = None, {}
+            self.say(f"Cleared (and {n} square correction(s))" if n else "Cleared", WHITE)
         elif k in (13, 10):                 # ENTER
             if self.typed:
                 t, self.typed = self.typed, ""
@@ -399,6 +585,12 @@ class App:
                 self.pending_board, self.plan = None, None
                 self.verified = True
                 self.say(f"Game set from vision: {self.game.board.fen()}", GREEN)
+        elif k == 9:                        # TAB: pause / resume auto play
+            if self.auto:
+                self.auto_paused = not self.auto_paused
+                self._seen = None
+                self.say("AUTO PAUSED (TAB resumes)" if self.auto_paused else
+                         "AUTO resumed - scanning", AMBER if self.auto_paused else GREEN)
         elif k == 8 or k == 127:            # backspace
             self.typed = self.typed[:-1]
         elif ch == " ":
@@ -476,7 +668,7 @@ class App:
                 return
             # pick the square whose column (z = 0.5 square) is nearest the click
             d = [np.hypot(*(v.geo.square_center(sq, 0.5) - (fx, fy))) for sq in range(64)]
-            self.selected = int(np.argmin(d))
+            self.selected = robot_sq(int(np.argmin(d)))
         elif x >= VW * len(self.views):
             sq = self.panel_square(x - VW * len(self.views), y)
             if sq is None:
@@ -485,6 +677,8 @@ class App:
                 self.manual_click(sq)
                 return
             self.selected = sq
+        if self.selected is None:
+            return
         self.say(f"{chess.square_name(self.selected)} selected: type P N B R Q K / "
                  "p n b r q k / . (empty), ESC cancels", CYAN)
 
@@ -580,6 +774,7 @@ class App:
         """One labelled sample per camera, sharing a stamp."""
         from pieces import save_sample
         stamp = None
+        labels = [labels[robot_sq(sq)] for sq in range(64)]     # chess -> robot squares
         for v in self.views:
             f = frames_by_view.get(v.key)
             if f is not None and v.geo is not None:
@@ -726,14 +921,16 @@ class App:
                 colors = list(colors)
                 for sq, col in self.highlight.items():
                     colors[sq] = col
+            labels = {robot_sq(sq): lab for sq, lab in labels.items()}
+            colors = [colors[robot_sq(sq)] for sq in range(64)]
             geo.draw(img, labels, colors)
             if self.selected is not None:
-                cv2.polylines(img, [geo.square_polygon(self.selected).astype(np.int32)], True,
+                cv2.polylines(img, [geo.square_polygon(robot_sq(self.selected)).astype(np.int32)], True,
                               (255, 0, 255), 3)
             arrow = self.plan[0] if self.plan else self.pending
             if arrow:
-                a = tuple(int(c) for c in geo.square_center(arrow.from_square))
-                b = tuple(int(c) for c in geo.square_center(arrow.to_square))
+                a = tuple(int(c) for c in geo.square_center(robot_sq(arrow.from_square)))
+                b = tuple(int(c) for c in geo.square_center(robot_sq(arrow.to_square)))
                 cv2.arrowedLine(img, a, b, (0, 140, 255), 5, cv2.LINE_AA, tipLength=0.2)
         if self.calib_clicks is not None and v is self.calib_view:
             for pt in self.calib_clicks:
@@ -777,7 +974,12 @@ class App:
             if all(f is None for f in frames):
                 time.sleep(0.05)
                 continue
-            if self.live and not self.busy and time.time() - last_live > 1.0:
+            if self.auto and not self.auto_paused and not self.busy and not self.game.board.is_game_over() \
+                    and self.calib_clicks is None and self.selected is None and not self.typed \
+                    and time.time() - last_live > config.AUTO_SCAN_S:
+                last_live = time.time()
+                self.run_scan(infer=True)
+            elif self.live and not self.busy and time.time() - last_live > 1.0:
                 last_live = time.time()
                 self.run_scan(infer=False)
             cv2.imshow("AR4 chess", self.draw(frames))
@@ -797,6 +999,21 @@ def main():
                     help="override the front camera's nearest rank (config.CAMERAS)")
     ap.add_argument("--no-auto-learn", dest="auto_learn", action="store_false",
                     help="do not save confirmed game positions as training data")
+    ap.add_argument("--play", action="store_true",
+                    help="real game: after the player's move is accepted, plan the robot's reply at once")
+    ap.add_argument("--robot-color", choices=("white", "black"), default="white",
+                    help="the side the robot plays (--play)")
+    ap.add_argument("--auto", action="store_true",
+                    help="auto play: scan continuously, accept the player's move when two scans agree, "
+                         "robot replies at once (TAB pauses)")
+    ap.add_argument("--from-board", action="store_true",
+                    help="start the game from the position the cameras see")
+    ap.add_argument("--to-move", choices=("player", "robot"), default="player",
+                    help="--from-board, non-start position: who moves first")
+    ap.add_argument("--fix", help="square corrections applied to the scans until the game starts, "
+                                  "e.g. f1=B,f7=p (uppercase white, lowercase black, . empty)")
+    ap.add_argument("--skill", type=int, choices=range(21), metavar="0-20",
+                    help="Stockfish skill level (default config.STOCKFISH_SKILL)")
     App(ap.parse_args()).loop()
 
 

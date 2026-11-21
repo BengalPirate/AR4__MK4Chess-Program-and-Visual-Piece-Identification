@@ -329,3 +329,34 @@ def test_plan_rejects_illegal():
     g = Game()
     with pytest.raises(ValueError):
         plan_move(g, chess.Move.from_uci("e2e5"))
+
+
+class LocBR:
+    """50 mm squares, board Z 100, with locate (robot squares)."""
+    def square_xyz(self, sq):
+        return (500.0 - 50 * chess.square_rank(sq), 50.0 * chess.square_file(sq), 100.0)
+
+    def locate(self, o):
+        o.xyz = self.square_xyz(chess.parse_square(o.where))
+        return o
+
+
+def test_files_mirrored_for_the_game(monkeypatch):
+    """Chess squares map to robot squares with the files mirrored: chess e1 (white
+    king) is robot d1; the engine's e2e4 is picked on robot d2 and placed on robot d4."""
+    from planner import robot_name, robot_sq, to_robot
+    monkeypatch.setattr(config, "CHESS_FILES_MIRRORED", True)
+    assert robot_name("e1") == "d1" and robot_name("a8") == "h8" and robot_name("tray:2") == "tray:2"
+    assert robot_sq(chess.E1) == chess.D1
+    g = Game()
+    ops = to_robot(plan_move(g, g.parse_move("e2e4")), g.board, LocBR())
+    assert [(o.kind, o.where) for o in ops] == [("pick", "d2"), ("place", "d4")]
+
+
+def test_illegal_move_taken_back(monkeypatch):
+    """The piece moved illegally is picked where it stands and put back on its square."""
+    from planner import plan_restore
+    monkeypatch.setattr(config, "CHESS_FILES_MIRRORED", True)
+    g = Game()
+    ops = plan_restore(g.board, chess.B1, chess.B3, "N", LocBR())   # knight b1 -> b3: illegal
+    assert [(o.kind, o.where, o.piece) for o in ops] == [("pick", "g3", "N"), ("place", "g1", "N")]

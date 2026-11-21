@@ -1,0 +1,70 @@
+camera front: /dev/video8
+camera side: /dev/video6
+Classifier: {'boards': 0, 'kind': 'fine-tuned ResNet-18', 'trained': '2026-11-17 21:19', 'photos': 1079, 'boards_used': 78}
+Robot connected: X=220.67 Y=-17.06 Z=245.15 Rz=-43.13 Ry=-104.11 Rx=0.02 | J1=-4.42 J2=6.71 J3=50.21 J4=0.00 J5=33.10 J6=40.59
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+c5 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+c5 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+f1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f7 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f1 set to 'b'. SPACE to re-scan with 1 correction(s)
+f7 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f7 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f7 set to 'p'. SPACE to re-scan with 2 correction(s)
+c1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+c1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+c1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+c1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f1 set to 'b'. SPACE to re-scan with 2 correction(s)
+d4 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+Cleared (and 2 square correction(s))
+Reading the start position: unsure of f1, f7 - hands clear? (click a square + type its piece to correct)
+f1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f1 set to 'b'. SPACE to re-scan with 1 correction(s)
+Reading the start position: unsure of f7 - hands clear? (click a square + type its piece to correct)
+d4 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+Reading the start position: unsure of f7 - hands clear? (click a square + type its piece to correct)
+f7 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f7 set to 'p'. SPACE to re-scan with 2 correction(s)
+c5 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+f1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f1 set to 'b'. SPACE to re-scan with 2 correction(s)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+d3 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+f1 selected: type P N B R Q K / p n b r q k / . (empty), ESC cancels
+f1 set to 'b'. SPACE to re-scan with 2 correction(s)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+Traceback (most recent call last):
+  File "/home/parallels/AR4/team2_chess/chess_demo.py", line 665, in on_mouse
+    self.say(f"{chess.square_name(self.selected)} selected: type P N B R Q K / "
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/parallels/AR4/venv/lib/python3.12/site-packages/chess/__init__.py", line 252, in square_name
+    return SQUARE_NAMES[square]
+           ~~~~~~~~~~~~^^^^^^^^
+TypeError: list indices must be integers or slices, not NoneType
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.TOO_MANY_BLACK_PIECES: 128>) - correct it (click a square + type its piece)

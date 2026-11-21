@@ -1,0 +1,19 @@
+Recovered from the operator session transcript (raw game logs were in a temporary folder that was cleared). Lines deduplicated; timestamps = when the log was read, not when the move was made.
+2026-11-20T21:30:17  e4 played (vision). Black to move
+2026-11-20T21:31:48  Nf6 played (robot). White to move
+2026-11-20T21:36:06  SAY: Game set from the board: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR - White to move (YOU)
+2026-11-20T21:36:06  SAY: e4 played (vision). Black to move
+2026-11-20T21:43:28  Game set from the board: rnbqkb1r/pppppppp/5n2/1B6/4P3/8/PPPP1PPP/RNBQK1NR - Black to move (robot)
+2026-11-20T21:43:28  PLACE  P @ tray:0   (X 523.4 Y 219.5 board Z 63.1)  - to captured tray
+2026-11-20T21:43:28  place P at tray:0
+2026-11-20T21:43:28  Nxe4 played (robot). White to move
+2026-11-20T21:49:16  Nh3 played (vision). Black to move
+2026-11-20T21:49:16  a6 played (robot). White to move
+2026-11-20T21:50:15  Nc5 played (robot). White to move
+2026-11-20T21:50:19  Ba4 played (vision). Black to move
+2026-11-20T22:00:19  11:    PLACE  P @ tray:0   (X 523.4 Y 219.5 board Z 63.1)  - to captured tray
+2026-11-20T22:00:19  27:Nxe4 played (robot). White to move
+2026-11-20T22:00:19  76:Nh3 played (vision). Black to move
+2026-11-20T22:00:19  95:a6 played (robot). White to move
+2026-11-20T22:00:19  98:Ba4 played (vision). Black to move
+2026-11-20T22:00:19  111:Nc5 played (robot). White to move

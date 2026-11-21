@@ -206,10 +206,10 @@ class Executor:
             u = self.br.file_step[:2] / np.linalg.norm(self.br.file_step[:2])
             pre = (xyz[0] + d * u[0], xyz[1] + d * u[1], xyz[2])
             if kin.ik_down(pre, self.yaw, self._joints(), self.min_tilt) is not None:
-                self._goto(pre)
+                self._goto(pre, config.TRAVEL_SPEED_PCT)
             else:
                 self.log("    (backlash pre-approach point out of reach - direct approach)")
-        self._goto(xyz)
+        self._goto(xyz, config.TRAVEL_SPEED_PCT)
 
     # ---- pick / place
     def yaw_for(self, piece):
@@ -270,6 +270,21 @@ class Executor:
         for attempt in range(tries):
             if attempt:
                 self.log(f"    RETRY {attempt}")
+            back = float(getattr(config, "RANK8_THIRD_TRY_BACK_MM", 0.0) or 0.0)
+            if attempt == 2 and is_square and op.where[1] == "8" and back > 0:
+                # operator's rule: two misses on rank 8 -> aim 15 mm toward the robot
+                nx, ny = x0 + back * up[0], y0 + back * up[1]
+                seed, ok = self._joints(), True
+                for z in (zb + t_full, zb + config.GRASP_Z[piece]):
+                    seed = kin.ik_down((nx, ny, z), self.yaw, seed, self.min_tilt)
+                    if seed is None:
+                        ok = False
+                        break
+                if ok:
+                    x, y = nx, ny
+                    self.log(f"    rank 8, two misses: aiming {back:.0f} mm toward the robot")
+                else:
+                    self.log(f"    rank 8: {back:.0f} mm toward the robot is out of reach - normal retry")
             self.grip.open(config.GRIP_OPEN_PIECE[piece])
             # approach at the LIFTED height: the cameras photograph the empty jaws here,
             # and the arm comes back to exactly this pose after gripping
@@ -337,16 +352,23 @@ class Executor:
                     return
                 raise MotionError(f"The jaws are empty but {op.where} is empty too - the piece was "
                                   "knocked or dragged away. Put it back on its square, then continue")
-            # missed: the piece is still on its square (nudged or untouched). Go back over
-            # the grip point and down before opening, so a piece that WAS held after all
-            # (camera wrong) is set back, never dropped.
-            if aside:
-                self._approach((x, y, zb + t_full))
-            z_rel = zb + config.GRASP_Z[piece] + config.PLACE_EXTRA_Z
-            self._vertical(x, y, zb + t_full, z_rel)
-            self.grip.open(config.GRIP_OPEN_PIECE[piece])
+            # missed: the piece is still on its square (nudged or untouched).
+            if held:
+                # the jaws DO show something while the square still looks occupied (the
+                # readings contradict): go back down and set it back, never drop it
+                self.log("    square occupied but the jaws show a piece - setting it back down first")
+                if aside:
+                    self._approach((x, y, zb + t_full))
+                z_rel = zb + config.GRASP_Z[piece] + config.PLACE_EXTRA_Z
+                self._vertical(x, y, zb + t_full, z_rel)
+                self.grip.open(config.GRIP_OPEN_PIECE[piece])
+                self._vertical(x, y, z_rel, zb + t_full)
+            else:
+                # operator's rule 2026-11-20: the piece is on the board right under the jaws -
+                # do NOT go back down onto it; open in the air where the arm is
+                self.log("    missed: the piece is still on the square - opening in the air (no descent)")
+                self.grip.open(config.GRIP_OPEN_PIECE[piece])
             self.carry_tilt = 0.0
-            self._vertical(x, y, z_rel, zb + t_full)
             if attempt + 1 < tries:
                 x, y = self._next_aim(op, bx, by, x0, y0, fallback[min(attempt, 1)], along, up)
         raise MotionError(f"Grip missed {op.where} {tries} times (camera still sees the piece "
@@ -385,7 +407,7 @@ class Executor:
         x, y, z = kin.vfk(self._joints())
         aside = (x + d[0], y + d[1], z)
         if kin.ik_down(aside, self.yaw, self._joints(), self.min_tilt) is not None:
-            self._goto(aside)
+            self._goto(aside, config.TRAVEL_SPEED_PCT)
         time.sleep(0.8)                     # let the arm and the camera image settle
 
     def _next_aim(self, op, bx, by, x0, y0, fallback_mm, along, up):
@@ -585,5 +607,5 @@ class Executor:
         if not p:
             return
         self.travel()
-        self.arm.move_joints(list(p["joints"]), config.SPEED_PCT)
+        self.arm.move_joints(list(p["joints"]), config.TRAVEL_SPEED_PCT)
         self.lock.release()

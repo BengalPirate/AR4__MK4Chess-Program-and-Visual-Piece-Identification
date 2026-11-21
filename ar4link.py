@@ -25,6 +25,11 @@ APP_CONFIG = os.environ.get(
     os.path.expanduser("~/AR4/AR4 HMI Interface 6.7 source/ARconfig.json"))
 
 
+# Hard speed cap (percent). Was 25 for testing; 2026-11-20 operator asked for a faster
+# game: ramp travel 25 -> 50 -> 75 while watching for skipped steps / slipping pieces.
+MAX_SPEED_PCT = 75
+
+
 def find_port():
     """Find the Teensy's serial port, preferring the stable /dev/serial/by-id path
     (ttyACM numbers change on reconnect)."""
@@ -155,8 +160,8 @@ class AR4:
         # Percent speed only: firmware 6.7.1's mm/s ("Sm") timing math divides by
         # (1.2 * steps - 36), so short moves of ~30 motor steps get near-infinite
         # step delays and the board stops responding.
-        if not 1 <= speed_pct <= 25:
-            raise ValueError("speed_pct must be 1-25 for safe testing")
+        if not 1 <= speed_pct <= MAX_SPEED_PCT:
+            raise ValueError(f"speed_pct must be 1-{MAX_SPEED_PCT}")
         wrist = "F" if self.pose().joints[4] > 0 else "N"
         cmd = (f"{kind}X{x:.3f}Y{y:.3f}Z{z:.3f}Rz{rz:.3f}Ry{ry:.3f}Rx{rx:.3f}"
                f"J70.00J80.00J90.00Sp{speed_pct:.0f}Ac10Dc10Rm50")
@@ -226,8 +231,8 @@ class AR4:
         """Move to absolute joint angles J1..J6 (deg). With safe=True and
         enforce_limits, targets outside the manually recorded joint ranges
         (config/joint_limits.json, manual_calib.py) are refused."""
-        if not 1 <= speed_pct <= 25:
-            raise ValueError("speed_pct must be 1-25 for safe testing")
+        if not 1 <= speed_pct <= MAX_SPEED_PCT:
+            raise ValueError(f"speed_pct must be 1-{MAX_SPEED_PCT}")
         if self.safe and enforce_limits:
             import config
             for i, (lo, hi) in config.joint_limits().items():
