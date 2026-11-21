@@ -309,7 +309,15 @@ class BoardRobot:
         fv = float(np.clip((v - 3) / 4, 0.0, 1.0))
         c4 = (1 - fu) * corr("a4") + fu * corr("h4")
         c8 = (1 - fu) * corr("a8") + fu * corr("h8")
-        return (1 - fv) * c4 + fv * c8
+        sx, sy = self._tilted_side_shift()
+        return (1 - fv) * c4 + fv * c8 + np.array([sx, sy, 0.0])
+
+    def _tilted_side_shift(self):
+        """Robot-frame (dx, dy) of config.TILTED_TOWARD_A_MM: every tilted pose moved
+        that far toward the a-file (2026-11-20 re-calibration of J4/J6)."""
+        d = float(getattr(config, "TILTED_TOWARD_A_MM", 0.0) or 0.0)
+        uh = self.file_step[:2] / np.linalg.norm(self.file_step[:2])
+        return float(-d * uh[0]), float(-d * uh[1])
 
     def board_z(self, x, y):
         a, b, c = self.plane
@@ -333,7 +341,8 @@ class BoardRobot:
             dx, dy = config.TILTED_SQUARE_OFFSET_MM.get(chess.square_name(square), (0.0, 0.0))
             rx, ry = getattr(config, "RANK8_TILTED_OFFSET_MM", (0.0, 0.0))
             cx, cy = self._aim_fix(square, along_file=False)
-            return (float(p[0] + dx + rx + cx), float(p[1] + dy + ry + cy), float(p[2]))
+            sx, sy = self._tilted_side_shift()
+            return (float(p[0] + dx + rx + cx + sx), float(p[1] + dy + ry + cy + sy), float(p[2]))
         u, v = f / 7, r / 7
         c = self.c
         p = (1 - u) * (1 - v) * c["a1"] + u * (1 - v) * c["h1"] + u * v * c["h8"] + (1 - u) * v * c["a8"]

@@ -5,8 +5,8 @@
    106.68
   ]
  },
- "J5_zeroed": "2026-11-20 00:13:17",
+ "J5_zeroed": "2026-11-20 19:58:56",
  "saved": "2026-11-17 20:32:41",
  "margin_deg": 2.0,
- "note": "J1-J4,J6 Annin auto-cal (J5 excluded) 2026-11-20 00:11 after power-off; J5 zeroed by eye in manual_calib. J5 limits unchanged from 2026-11-17."
+ "note": "J1-J4,J6 Annin auto-cal (J5 excluded) 2026-11-20 ~19:57 after power-off and camera/arm move; J5 zeroed by eye in manual_calib 19:58. J5 limits unchanged from 2026-11-17."
 }

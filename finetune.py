@@ -28,6 +28,8 @@ from pieces import load_samples
 from train_photos import SEED, WEBCAM_TEST_DIR, empty_crop, piece_crop, split, to_input
 
 CNN_FILE = os.path.join(config.MODEL_DIR, "piece_cnn.pt")
+NEW_VIEW_STAMP = "20261120-2018"   # first board saved from the moved cameras
+MICRO = 64                  # crops per forward/backward chunk (memory bound)
 _MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 _STD = np.array([0.229, 0.224, 0.225], np.float32)
 
@@ -89,15 +91,23 @@ class WebcamSource:
         self.crops, self.labels, self.repeat = [], [], repeat
         self.mirror_pieces = mirror_pieces    # flip piece crops too (a mirrored piece is the same piece)
         self.boards = 0
-        for _, img, geo, labels in load_samples(data_dir):
-            self.crops += geo.crops(img)
+        self.reps = []                        # per crop: how many times per epoch
+        for name, img, geo, labels in load_samples(data_dir):
+            c = geo.crops(img)
+            self.crops += c
             self.labels += labels
+            # 2026-11-20: cameras moved (front now diagonal). Boards from the new views
+            # (saved from NEW_VIEW_STAMP on) get `repeat`; older boards once - this also
+            # keeps an epoch inside the VM's memory with 172 boards.
+            self.reps += [repeat if name[:15] >= NEW_VIEW_STAMP else 1] * len(c)
             self.boards += 1
 
     def sample(self, rng):
         crops, labels = [], []
-        for _ in range(self.repeat if self.crops else 0):
-            for c, l in zip(self.crops, self.labels):
+        for rep in range(self.repeat if self.crops else 0):
+            for c, l, r in zip(self.crops, self.labels, self.reps):
+                if rep >= r:
+                    continue
                 f = c.astype(np.float32) * rng.uniform(0.85, 1.15) + rng.uniform(-12, 12)
                 c = np.clip(f, 0, 255).astype(np.uint8)
                 if (l == "." or self.mirror_pieces) and rng.random() < 0.5:
@@ -157,13 +167,18 @@ def main():
             idx = order[i * bs:(i + 1) * bs]
             if len(idx) == 0:
                 continue
-            x, y = to_tensor([tr_c[j] for j in idx]), torch.from_numpy(tr_y[idx])
-            loss = lossf(net(x), y)
+            # 2026-11-20: 172 webcam boards made each of the 40 steps ~900 crops and the
+            # forward/backward ran out of memory (7.7 GB VM) -> accumulate the gradient
+            # over chunks of MICRO crops; same 40 optimizer steps per epoch.
             opt.zero_grad()
-            loss.backward()
+            for k in range(0, len(idx), MICRO):
+                part = idx[k:k + MICRO]
+                x, y = to_tensor([tr_c[j] for j in part]), torch.from_numpy(tr_y[part])
+                loss = lossf(net(x), y) * (len(part) / len(idx))
+                loss.backward()
+                tot += float(loss.detach()) * len(idx)
             opt.step()
             sched.step()
-            tot += float(loss.detach()) * len(idx)
         acc = float(np.mean(evaluate(net, va_c, va_y) == va_y))
         print(f"epoch {ep + 1}/{a.epochs}: loss {tot / len(order):.3f}  val {acc:.1%}  ({time.time() - t0:.0f}s)",
               flush=True)

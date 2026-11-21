@@ -328,6 +328,43 @@ def find_inner_corners(frame):
     return pts.reshape(-1, 2)
 
 
+def _auto_calibrate_corner(frame, corner):
+    """auto_calibrate for a camera looking at the board across a CORNER (diagonal
+    view, 2026-11-20): `corner` is the board corner nearest the camera, i.e. the
+    lowest of the four in the image. The camera sees the board from above, so the
+    image is not mirrored: a1 -> h1 -> h8 -> a8 runs with negative signed area in
+    image pixels (y down). That fixes the handedness; the named corner fixes the
+    rotation. Row/column order of OpenCV's grid does not matter."""
+    pts = find_inner_corners(frame)
+    if pts is None:
+        return None
+    g = pts.reshape(7, 7, 2)
+    src0 = [(j + 1, i + 1) for i in range(7) for j in range(7)]
+    dst = [g[i, j] for i in range(7) for j in range(7)]
+
+    def outer(src):
+        H, _ = cv2.findHomography(np.float32(src), np.float32(dst))
+        return cv2.perspectiveTransform(np.float32([[[0, 0]], [[8, 0]], [[8, 8]], [[0, 8]]]), H).reshape(4, 2)
+
+    def area(c):
+        return sum(c[k][0] * c[(k + 1) % 4][1] - c[(k + 1) % 4][0] * c[k][1] for k in range(4))
+
+    if area(outer(src0)) > 0:                       # mirrored assignment: swap x and y
+        src0 = [(y, x) for x, y in src0]
+    rot = [lambda x, y: (x, y), lambda x, y: (8 - y, x), lambda x, y: (8 - x, 8 - y), lambda x, y: (y, 8 - x)]
+    want = ["a1", "h1", "h8", "a8"].index(corner)
+    for r in rot:
+        src = [r(x, y) for x, y in src0]
+        c = outer(src)
+        if int(np.argmax(c[:, 1])) == want:         # the named corner is lowest in the image
+            break
+    else:
+        return None
+    lookup = {xy: p for xy, p in zip(src, dst)}
+    inner = [lookup[(x, y)] for y in range(1, 8) for x in range(1, 8)]
+    return c.tolist(), np.float32(inner).tolist()
+
+
 def auto_calibrate(frame, near="rank1"):
     """Find the board on an EMPTY board with no clicks.
 
@@ -339,8 +376,10 @@ def auto_calibrate(frame, near="rank1"):
     rank 1 is on the right). Returns corners (a1, h1, h8, a8) and the 49 inner
     corners, or None if the pattern is not found."""
     near = {1: "rank1", 8: "rank8"}.get(near, near)
+    if near in ("a1", "h1", "h8", "a8"):
+        return _auto_calibrate_corner(frame, near)
     if near not in ("rank1", "rank8", "fileA", "fileH"):
-        raise ValueError(f"near must be rank1/rank8/fileA/fileH, not {near!r}")
+        raise ValueError(f"near must be rank1/rank8/fileA/fileH or a corner a1/h1/h8/a8, not {near!r}")
     pts = find_inner_corners(frame)
     if pts is None:
         return None

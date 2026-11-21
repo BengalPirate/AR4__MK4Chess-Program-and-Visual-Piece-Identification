@@ -20,7 +20,7 @@ CAMERA_NAME = "Logitech Webcam C930e"
 # auto calibration): rank1 / rank8 / fileA / fileH. "file" = its calibration.
 # Scans classify every square in every attached view and fuse the results.
 CAMERAS = {
-    "front": {"name": "Logitech Webcam C930e", "near": "rank1",
+    "front": {"name": "Logitech Webcam C930e", "near": "h1",      # 2026-11-20: diagonal view across the h1 corner (was "rank1")
               "file": os.path.join(CONFIG_DIR, "board_image.json")},
     "side": {"name": "C920", "near": "fileA",
              "file": os.path.join(CONFIG_DIR, "board_image_side.json")},
@@ -148,6 +148,11 @@ TILTED_SQUARE_OFFSET_MM = {}
 # the operator's call: centre 10 mm toward the arm (-X), then 7 mm after the next test. Only rank 8 - the tilt
 # correction for ranks 3-7 still uses the taught a8/h8 points unchanged.
 RANK8_TILTED_OFFSET_MM = (-7.0, 0.0)
+# Every TILTED pose (rank 8, and tilted set-downs / picks elsewhere), board mm toward
+# the a-file. 2026-11-20 after the J1-J4/J6 re-calibration: hovers over a8 and h8 were
+# both 5 mm toward h (a1/h1 straight down centred) -> the new J4/J6 zero shifts tilted
+# poses sideways; operator: move 5 mm toward a.
+TILTED_TOWARD_A_MM = 5.0
 # Tilted SET-DOWNS on ranks 3-7 (a piece carried from rank 8), board mm toward rank 8.
 # 2026-11-19: with the backlash approach h5 set-downs landed 5.7 / 7.8 / 8.9 mm toward
 # rank 1 -> operator approved +7.5.

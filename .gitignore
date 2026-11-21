@@ -25,3 +25,4 @@ models/piece_cnn_2cam.pt
 models/piece_cnn_front_only_20261117.pt
 # live-game logs are report evidence
 !results/games/*.log
+models/piece_cnn_pre_diagonal_20261120.pt
