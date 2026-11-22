@@ -26,3 +26,7 @@ models/piece_cnn_front_only_20261117.pt
 # live-game logs are report evidence
 !results/games/*.log
 models/piece_cnn_pre_diagonal_20261120.pt
+# frames / screenshots showing a visitor (kept locally only)
+data/20261121-235556-053*
+data/20261122-*
+results/games/2026-11-22_checkmate_window.png

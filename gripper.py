@@ -27,6 +27,9 @@ BAUD = 9600
 OPEN_DEG, CLOSED_DEG = 45, 15   # measured: full travel, no stall
 MIN_DEG, MAX_DEG = 15, 50       # never command outside the fitted travel (2026-11-16: 51 loads, 53 stalls)
 STALL_AMPS = 0.8
+OPEN_STALL_AMPS = 1.5            # opening only (see open())
+OPEN_GRACE_S = 0.5
+STALL_GRACE_S = 0.3              # ignore this long after each step: the servo's start burst is not a stall
 IDLE_MAX_AMPS = 0.45    # an open, free gripper reads 0.1-0.3 A; a bound one 0.4-0.6
 # USB IDs of common Nano boards: CH340 clone, FTDI, genuine Arduino
 NANO_IDS = {(0x1A86, 0x7523), (0x0403, 0x6001), (0x2341, 0x0043), (0x2341, 0x0058),
@@ -95,7 +98,7 @@ class Gripper:
                                "not loaded, or board unpowered")
         return reply
 
-    def set_angle(self, deg, step=5, settle=0.5):
+    def set_angle(self, deg, step=5, settle=0.5, stall_amps=None, grace_s=None):
         """Move servo 0 in `step`-degree increments, watching the current.
 
         A short spike while moving is normal; a current above STALL_AMPS on three
@@ -112,9 +115,13 @@ class Gripper:
                 raise GripperError(f"Unexpected reply to servo command: {reply!r}")
             self.angle = nxt
             high = 0
-            end = time.monotonic() + settle   # no position feedback: wait, watching current
+            start = time.monotonic()
+            end = start + settle              # no position feedback: wait, watching current
             while time.monotonic() < end or high:
-                high = high + 1 if self.current() > STALL_AMPS else 0
+                amps = self.current()
+                if time.monotonic() - start < (STALL_GRACE_S if grace_s is None else grace_s):
+                    continue                  # start-of-move burst (up to ~1.6 A, 2026-11-21)
+                high = high + 1 if amps > (STALL_AMPS if stall_amps is None else stall_amps) else 0
                 if high >= 3:
                     self._cmd(f"SV0P{prev}", expect_line=False)
                     self.angle = prev
@@ -203,11 +210,20 @@ class Gripper:
                     self._cmd(f"SV0P{min(30, deg)}", expect_line=False)
                     self.angle = min(30, deg)
                     time.sleep(0.8)
+                # 2026-11-22: opening from pads pressed together draws long bursts that
+                # tripped the 0.8 A stall check. Opening cannot crush anything, and a real
+                # jam is caught by the idle check below -> looser limits while opening.
+                lim = dict(stall_amps=OPEN_STALL_AMPS, grace_s=OPEN_GRACE_S)
                 if self.angle > deg:
                     # coming back from a wider opening (49 for R/Q/K) the jaws stay
                     # loaded at deg (0.46 A); approached from below they are free
-                    self.set_angle(max(MIN_DEG, deg - 6))
-                self.set_angle(deg)
+                    self.set_angle(max(MIN_DEG, deg - 6), **lim)
+                # 2026-11-21: above ~42 deg the jaws meet light resistance (0.1-0.24 A);
+                # 5-deg jumps into it spiked past STALL_AMPS -> false "jammed". Open in
+                # 2-deg steps over the last part.
+                if deg > 40 and self.angle < 40:
+                    self.set_angle(40, **lim)
+                self.set_angle(deg, step=2 if deg > 40 else 5, **lim)
             except GripperError as e:
                 last = e
                 time.sleep(1.0)

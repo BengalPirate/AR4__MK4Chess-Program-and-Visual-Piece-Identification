@@ -1,0 +1,6 @@
+camera front: /dev/video4
+camera side: /dev/video2
+Classifier: {'boards': 0, 'kind': 'fine-tuned ResNet-18', 'trained': '2026-11-20 22:19', 'photos': 1079, 'boards_used': 172}
+Robot connected: X=220.67 Y=-17.06 Z=245.15 Rz=-43.13 Ry=-104.11 Rx=0.02 | J1=-4.42 J2=6.71 J3=50.21 J4=0.00 J5=33.10 J6=40.59
+Start position read - checking once more
+Game set from the board: r1b1kb1r/ppp2ppp/2R5/4p3/P5nq/4P1P1/1PPPP3/1NBQKBN1 - White to move (YOU)

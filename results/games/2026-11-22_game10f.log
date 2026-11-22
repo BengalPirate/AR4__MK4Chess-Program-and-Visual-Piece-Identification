@@ -1,0 +1,27 @@
+camera front: /dev/video4
+camera side: /dev/video2
+Classifier: {'boards': 0, 'kind': 'fine-tuned ResNet-18', 'trained': '2026-11-20 22:19', 'photos': 1079, 'boards_used': 172}
+Robot connected: X=220.67 Y=-17.06 Z=245.15 Rz=-43.13 Ry=-104.11 Rx=0.02 | J1=-4.42 J2=6.71 J3=50.21 J4=0.00 J5=33.10 J6=40.59
+Start position read - checking once more
+Game set from the board: r1b1kb1r/ppp2ppp/2R5/4p3/P5nq/4P1P1/1PPPP3/1NBQKBN1 - Black to move (robot)
+
+Engine (Stockfish skill 20) selects Qxg3# = h4g3
+    PICK   P @ g3       (X 464.9 Y 69.9 board Z 97.8)  - capture
+    PLACE  P @ tray:4   (X 331.1 Y 242.3 board Z 63.1)  - to captured tray
+    PICK   q @ h4       (X 419.8 Y 119.7 board Z 97.9)
+    PLACE  q @ g3       (X 464.9 Y 69.9 board Z 97.8)
+Engine: Qxg3# (h4 -> g3). X = execute
+Robot executing Qxg3# (h4g3) ... (SPACE-bar does not stop the arm: use the E-stop)
+  pick P at g3
+    cameras: piece -1.9 mm toward h, -0.7 mm toward rank 8
+    grip at Z 121 (board 98): felt [(43, 0.11), (41, 0.03), (39, 0.07), (37, 0.03), (35, 0.01), (33, 0.05), (31, 0.2), (29, 0.26), (27, 0.71), (25, 1.26)]
+    camera check: jaws HOLD a piece {'front': 19.0, 'current_rise': 1}; g3 looks empty
+  place P at tray:4
+  pick q at h4
+    cameras: piece -7.2 mm toward h, -3.2 mm toward rank 8 -> pick shifted -15 mm toward h, -0 mm toward rank 8
+    grip at Z 155 (board 98): felt [(45, 0.1), (43, 0.05), (41, 0.06), (39, 0.04), (37, 0.19), (35, 0.29), (33, 0.72), (31, 1.11)]
+    camera check: jaws HOLD a piece {'front': 28.8, 'current_rise': 1}; h4 looks empty
+  place q at g3
+    placement check g3: -1.4 mm toward h, +0.3 mm toward rank 8 - OK
+Qxg3# played (robot). Checkmate - Black wins
+Robot played h4g3. Checking the board...

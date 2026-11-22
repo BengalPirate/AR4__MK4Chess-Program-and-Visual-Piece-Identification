@@ -126,3 +126,36 @@ def test_grip_missed_twice_stops(tmp_path):
     with pytest.raises(MotionError, match="missed"):
         ex.run([br.locate(o) for o in plan_move(g, g.parse_move("e2e4"))], park=False)
     assert [k for k, _ in ex.grip.log].count("hold") == 1 + config.GRIP_RETRIES
+
+
+def test_undecided_pick_is_retried_not_stopped(tmp_path):
+    """2026-11-22 (h4 capture): a pick the cameras cannot confirm (undecided even from
+    aside) is retried - with no contact felt the jaws open just above the piece's top
+    over its square - instead of stopping the game."""
+    import kin
+    br = make_robot(tmp_path)
+    g = Game()
+    seen = iter([None, None, "empty"])        # over the square, from aside, then the retry
+    logs = []
+    ex = Executor(DryArm(br.park["joints"] if br.park else [0, 30, 0, 0, 60, 0]), DryGripper(), br,
+                  BoardLock(str(tmp_path / "l")), log=logs.append, pick_check=lambda sq: next(seen))
+    ops = [br.locate(o) for o in plan_move(g, g.parse_move("e2e4"))]
+    ex.run(ops, park=False)
+    assert [k for k, _ in ex.grip.log].count("hold") == 2
+    assert any("no contact felt" in m for m in logs)
+    # it opened over e2 no lower than 5 mm above a standing pawn's top
+    e2 = np.array(ops[0].xyz[:2])
+    zb = ops[0].xyz[2]
+    lows = [kin.vfk(js)[2] for _, js in ex.arm.log
+            if np.linalg.norm(np.array(kin.vfk(js)[:2]) - e2) < 0.5]
+    assert min(lows) >= zb + config.GRASP_Z["P"] - 0.5      # the real grip, nothing lower
+
+
+def test_undecided_pick_still_stops_after_all_tries(tmp_path):
+    br = make_robot(tmp_path)
+    g = Game()
+    ex = Executor(DryArm(br.park["joints"] if br.park else [0, 30, 0, 0, 60, 0]), DryGripper(), br,
+                  BoardLock(str(tmp_path / "l")), log=lambda *a: None, pick_check=lambda sq: None)
+    with pytest.raises(MotionError, match="undecided"):
+        ex.run([br.locate(o) for o in plan_move(g, g.parse_move("e2e4"))], park=False)
+    assert [k for k, _ in ex.grip.log].count("hold") == 1 + config.GRIP_RETRIES

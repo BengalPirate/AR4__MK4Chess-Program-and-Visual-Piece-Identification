@@ -1,0 +1,41 @@
+camera front: /dev/video4
+camera side: /dev/video2
+Classifier: {'boards': 0, 'kind': 'fine-tuned ResNet-18', 'trained': '2026-11-20 22:19', 'photos': 1079, 'boards_used': 172}
+Corrupt JPEG data: premature end of data segment
+Robot connected: X=220.67 Y=-17.06 Z=245.15 Rz=-43.13 Ry=-104.11 Rx=0.02 | J1=-4.42 J2=6.71 J3=50.21 J4=0.00 J5=33.10 J6=40.59
+Warning: Ignoring XDG_SESSION_TYPE=wayland on Gnome. Use QT_QPA_PLATFORM=wayland to run on Wayland anyway.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+Corrupt JPEG data: 18 extraneous bytes before marker 0xd9
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+Corrupt JPEG data: 42 extraneous bytes before marker 0xd9
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+Corrupt JPEG data: 16 extraneous bytes before marker 0xd9
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+Corrupt JPEG data: 60 extraneous bytes before marker 0xd9
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+Reading the start position: unsure of h2 - hands clear? (click a square + type its piece to correct)
+Corrupt JPEG data: 39 extraneous bytes before marker 0xd9
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+Corrupt JPEG data: premature end of data segment
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+Corrupt JPEG data: 38 extraneous bytes before marker 0xd9
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+Corrupt JPEG data: premature end of data segment
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)
+The board as read is not a legal chess position (<Status.NO_WHITE_KING: 1>) - correct it (click a square + type its piece)

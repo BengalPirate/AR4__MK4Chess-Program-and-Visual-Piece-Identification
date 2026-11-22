@@ -512,6 +512,11 @@ class App:
             self.say("Start position read - checking once more", CYAN)
             return
         self.game, self.plan, self.pending, self.overrides = Game(b.fen()), None, None, {}
+        tray = getattr(self.args, "tray", None)
+        if tray:
+            # 2026-11-22: a restarted game must know the tray slots already in use, or the
+            # robot sets a captured piece down on top of one (h4 pawn onto slot 0's knight)
+            self.game.tray = [None if c in ".-" else c for c in tray]
         self.started, self.verified = True, True
         side = "White" if b.turn == chess.WHITE else "Black"
         self.say(f"Game set from the board: {b.board_fen()} - {side} to move "
@@ -1010,6 +1015,8 @@ def main():
                     help="start the game from the position the cameras see")
     ap.add_argument("--to-move", choices=("player", "robot"), default="player",
                     help="--from-board, non-start position: who moves first")
+    ap.add_argument("--tray", help="--from-board: tray slots already holding pieces, one FEN letter per "
+                                   "slot from slot 0, '.' = empty (e.g. nRpP)")
     ap.add_argument("--fix", help="square corrections applied to the scans until the game starts, "
                                   "e.g. f1=B,f7=p (uppercase white, lowercase black, . empty)")
     ap.add_argument("--skill", type=int, choices=range(21), metavar="0-20",

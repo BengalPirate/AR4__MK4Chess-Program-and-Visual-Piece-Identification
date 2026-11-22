@@ -1,0 +1,51 @@
+camera front: /dev/video4
+camera side: /dev/video2
+Classifier: {'boards': 0, 'kind': 'fine-tuned ResNet-18', 'trained': '2026-11-20 22:19', 'photos': 1079, 'boards_used': 172}
+Corrupt JPEG data: premature end of data segment
+Robot connected: X=220.67 Y=-17.06 Z=245.15 Rz=-43.13 Ry=-104.11 Rx=0.02 | J1=-4.42 J2=6.71 J3=50.21 J4=0.00 J5=33.10 J6=40.59
+Warning: Ignoring XDG_SESSION_TYPE=wayland on Gnome. Use QT_QPA_PLATFORM=wayland to run on Wayland anyway.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+Reading the start position: unsure of d1 - hands clear? (click a square + type its piece to correct)
+Reading the start position: unsure of d1 - hands clear? (click a square + type its piece to correct)
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: 62 extraneous bytes before marker 0xd9
+Start position read - checking once more
+Corrupt JPEG data: premature end of data segment
+Reading the start position: unsure of d1 - hands clear? (click a square + type its piece to correct)
+Corrupt JPEG data: 21 extraneous bytes before marker 0xd9
+Game set from the board: r1bqkb1r/ppp2ppp/2R5/4p3/P5nP/4P3/1PPPP1P1/1NBQKBN1 - Black to move (robot)
+
+Engine (Stockfish skill 20) selects Qxh4+ = d8h4
+    PICK   P @ h4       (X 419.8 Y 119.7 board Z 97.9)  - capture
+    PLACE  P @ tray:0   (X 523.4 Y 219.5 board Z 63.1)  - to captured tray
+    PICK   q @ d8       (X 204.4 Y -44.6 board Z 101.3)
+    PLACE  q @ h4       (X 419.8 Y 119.7 board Z 97.9)
+Engine: Qxh4+ (d8 -> h4). X = execute
+Robot executing Qxh4+ (d8h4) ... (SPACE-bar does not stop the arm: use the E-stop)
+  pick P at h4
+    cameras: piece -6.6 mm toward h, +7.4 mm toward rank 8 -> pick shifted -7 mm toward h, +15 mm toward rank 8
+    grip at Z 121 (board 98): felt [(43, 0.07), (41, 0.03), (39, 0.06), (37, 0.02), (35, 0.03), (33, 0.03), (31, 0.11), (29, 0.2), (27, 0.55), (25, 1.11)]
+    camera check: jaws HOLD a piece {'front': 47.5, 'current_rise': 1}; h4 looks empty
+  place P at tray:0
+Corrupt JPEG data: 17 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+  pick q at d8
+    cameras: piece +0.9 mm toward h, +2.6 mm toward rank 8
+Corrupt JPEG data: 41 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 57 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: premature end of data segment
+    grip at Z 158 (board 101): felt [(45, 0.07), (43, 0.02), (41, 0.02), (39, 0.03), (37, 0.14), (35, 0.21), (33, 0.45), (31, 0.93)]
+    camera check: jaws HOLD a piece {'front': 40.1, 'side': 28.3, 'current_rise': 1}; d8 looks empty
+  place q at h4
+  motion stopped - arm left in place, interlock still held
+ROBOT STOPPED: The piece is NOT on h4 after the set-down (the jaws were probably empty) - check the gripper and the board - AUTO PAUSED: fix the board, then TAB

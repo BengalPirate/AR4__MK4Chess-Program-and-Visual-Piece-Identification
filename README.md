@@ -8,7 +8,7 @@ rights, captured pieces); a legal move is selected; and the move is turned into
 pick-and-place commands for an Annin Robotics AR4 MK4 arm with a servo gripper.
 Anything uncertain pauses for the operator instead of moving the arm.
 
-Final report (DRAFT): [`docs/Team2_Final_Report.pdf`](docs/Team2_Final_Report.pdf) – rebuild with
+Final report: [`docs/Team2_Final_Report.pdf`](docs/Team2_Final_Report.pdf) – rebuild with
 `python docs/game_stats.py && python docs/make_final_report.py`.
 Checkpoint 2 report: [`docs/Team2_Checkpoint2_Report.pdf`](docs/Team2_Checkpoint2_Report.pdf)
 
@@ -20,11 +20,12 @@ Checkpoint 2 report: [`docs/Team2_Checkpoint2_Report.pdf`](docs/Team2_Checkpoint
 | Webcam frames never trained on (38: 20 start positions, 18 frames of 8 other positions) | **98.1 %** exact, colour 100 % on detected pieces |
 | Other positions (mid-games incl. both sides castled, colours swapped, scrambled, endgame) | 98.4 % exact; mid-game errors are pieces hidden behind taller ones |
 | Move inference on webcam boards (88 simulated moves) | 56 correct and accepted, 32 paused for the operator, **0 wrong moves accepted** |
-| Unit tests (`pytest tests`) | 34 / 34 pass: legal / illegal moves, castling rights, en passant, promotion, undo, move inference, special-move plans, J5 window, interlock, pick checks |
+| Unit tests (`pytest tests`) | 38 / 38 pass: legal / illegal moves, castling rights, en passant, promotion, undo, move inference, special-move plans, J5 window, interlock, pick checks and retries, diagonal camera calibration |
 | Real arm, 10 % speed | all 32 pieces moved two ranks forward (pawns, back ranks, tilted grips on rank 8) |
-| Two webcams, 40 held-out boards | **99.3 %** exact, colour 100 % (`results/accuracy_cnn_2cam.md`) |
-| Live games 2026-11-20 (human White, robot Black, Stockfish 16) | 20 robot moves incl. 4 captures to the tray; 46 / 52 picks first try; every move verified by the cameras (`results/games/`) |
-| Two arms alternating | **not yet run** – one arm only (see Known limitations) |
+| Two webcams, 40 held-out boards | **99.4 %** exact, colour 100 % (current model, `results/accuracy_cnn_diag.md`) |
+| Live games 2026-11-20 and 11-22 (person White, robot Black, Stockfish 16) | 28 robot moves incl. 6 captures to the tray; 60 / 68 picks first try; every move verified by the cameras (`results/games/summary.md`) |
+| Live game 2026-11-22 | full game to **checkmate by the robot**: 1.h4 e5 2.Rh3 d5 3.Re3 Nc6 4.a4 Nf6 5.Ra3 Ng4 6.Rac3 d4 7.Rxc6 dxe3 8.fxe3 Qxh4+ 9.g3 Qxg3# (`results/games/`) |
+| Scope | one AR4 against a person – confirmed as sufficient by the course advisor, who watched it play live (see Known limitations) |
 
 Details: `results/accuracy_cnn.md` (photos), `results/accuracy_webcam.md` (webcam,
 `python tests/webcam_report.py`), `results/test_log.md`
@@ -82,7 +83,7 @@ Two webcams watch the board (`config.CAMERAS`):
 
 | View | Camera | Position | Calibration file |
 |---|---|---|---|
-| `front` | Logitech C930e | behind White (rank 1 nearest) | `config/board_image.json` |
+| `front` | Logitech C930e | diagonally across the h1 corner (since 2026-11-20) | `config/board_image.json` |
 | `side` | Logitech C920 PRO | beside the a-file (Black on the left of its image) | `config/board_image_side.json` |
 
 `cameras.py` opens every attached camera by name, preferring the direct USB
@@ -153,6 +154,7 @@ the crops the classifier was trained on. The decoder occasionally reports a
 | Cameras: empty board in view of both | `calibrate_camera.py` (or K in the app) | `config/board_image.json`, `config/board_image_side.json`, `results/calibration_<camera>.png` |
 | Board in robot coordinates: closed jaw tips touching a1, h1, h8, a8; tray; PARK | `robot_setup.py` | `config/board_robot.json` |
 | Check reach / heights on real pieces | `reach_check.py`, `hover_test.py` | – |
+| Camera nudged with pieces on the board | `camera_realign.py front` (`--dry-run` to only measure) | updated `config/board_image*.json`, old file in `config/old/` |
 
 Measured grip settings (`config.py`): grip heights above the board P 23,
 N 35, B 45, R 35, Q 57, K 68 mm; gripper tool length 64 mm past the J6 flange;
@@ -170,11 +172,13 @@ python chess_demo.py --robot --auto --from-board --robot-color black
 #   --to-move robot     non-standard start position with the robot to move
 #   --skill 0-20        Stockfish strength (default 20)
 #   --fix f1=B,f7=p     square corrections applied until the game starts
+#   --tray nRpP         restart: tray slots already holding captured pieces (. = empty)
 ```
 
 In auto play the game scans every 1.5 s; the player's move is accepted when two scans agree,
 the robot replies at once and the board is verified before the next turn. TAB pauses/resumes;
-any stop pauses until the operator fixes the board and presses TAB. Keep the host computer
+any stop pauses until the operator fixes the board and presses TAB. Do not press other keys in the
+game window during a stop (L / I / T save training frames or start retraining). Keep the host computer
 awake (macOS: `caffeinate -is`): if it sleeps, the VM's USB devices drop.
 
 Keys are listed at the top of `chess_demo.py` (SPACE scan, P engine move,
@@ -183,7 +187,8 @@ M manual / AI mode, X execute, Y live labels, V set game from the board, U undo 
 Other tools: `live_view.py` (both cameras side by side, to aim them), `save_board.py` (save a labelled
 board for training or testing), `tests/eval_webcam.py` (accuracy and
 move-inference test on saved boards), `shift_test.py` (arm test: move pieces
-two ranks), `gripper_test.py`, `jog_joint.py`.
+two ranks), `gripper_test.py`, `jog_joint.py`, `grip_measure.py` (where the jaws meet each
+piece type, after changing the gripper pads), `camera_realign.py`.
 
 ## Files
 
@@ -226,16 +231,20 @@ two ranks), `gripper_test.py`, `jog_joint.py`.
 
 ## Known limitations
 
-- **One arm only.** The assignment's two-arm game (both AR4s alternating turns) has not
-  been run; a human plays White. Each arm would run its own program with its own taught
-  board and the shared `motion.BoardLock` (set `AR4_BOARD_LOCK` to a shared path); the
-  interlock is unit-tested only.
+- **One arm against a person.** The assignment text describes two AR4s alternating turns; the
+  course advisor confirmed that the robot playing a person is sufficient, and a person plays
+  White. For two arms, each would run its own program with its own taught board and the shared
+  `motion.BoardLock` (set `AR4_BOARD_LOCK` to a shared path); the interlock is unit-tested only.
+- The side camera reads h4 poorly in the current setup (one false stop on 2026-11-22).
+- The gripper's foam pads wear; worn or too-thick pads raise the servo's resting current and
+  cause false "jammed" stops – replace them (`grip_measure.py` to check).
 - Castling, en passant and promotion are planned and unit-tested but not yet run on the arm.
 - Rank 8 is at the edge of reach (worked with the gripper tilted 30°); rank-8 picks are the
   least reliable and the camera offset reading there is unreliable. Third rank-8 try aims
   15 mm toward the robot (`config.RANK8_THIRD_TRY_BACK_MM`).
 - Pieces hidden behind taller pieces are the main recognition error; the side camera helps.
-- Cameras get bumped: the tile-alignment check pauses the game; recalibrate (empty board).
+- Cameras get bumped: the tile-alignment check pauses the game; `camera_realign.py` (pieces on)
+  or recalibrate with an empty board.
 - A USB re-attach can restart the Teensy, which then reads all joints as 0: do not move the
   arm until the angles are restored or the arm is recalibrated.
 

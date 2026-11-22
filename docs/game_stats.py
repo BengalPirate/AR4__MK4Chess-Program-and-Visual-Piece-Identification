@@ -53,9 +53,14 @@ def parse_log(path):
     return g
 
 
-def grip_stats(day="2026-11-20"):
+GAME_DAYS = ("2026-11-20", "2026-11-22")      # days with live games (grips.csv rows of those days)
+
+
+def grip_stats(days=GAME_DAYS):
+    if isinstance(days, str):
+        days = (days,)
     rows = [r for r in csv.DictReader(open(os.path.join(ROOT, "results", "grips.csv")))
-            if r["time"].startswith(day)]
+            if r["time"][:10] in days]
     first = [r for r in rows if r["attempt"] == "0"]
     ok = lambda rs: sum(r["square_seen"] == "empty" for r in rs)   # noqa: E731
     r8 = [r for r in first if r["square"].endswith("8")]
@@ -73,12 +78,12 @@ def scan_stats():
 
 
 def main():
-    games = [parse_log(p) for p in sorted(glob.glob(os.path.join(GAMES, "2026-11-20_game*.log")))]
+    games = [parse_log(p) for d in GAME_DAYS for p in sorted(glob.glob(os.path.join(GAMES, f"{d}_game*.log")))]
     tot = {k: sum(len(g[k]) if isinstance(g[k], list) else g[k] for g in games)
            for k in ("robot_moves", "player_moves", "captures_robot", "tray_places", "place_ok",
                      "place_fix", "retries", "rank8_back", "stops", "illegal", "paused_unsure", "verified")}
     gs, sc = grip_stats(), scan_stats()
-    lines = ["# Live games 2026-11-20 - summary (docs/game_stats.py)", "",
+    lines = ["# Live games 2026-11-20 and 2026-11-22 - summary (docs/game_stats.py)", "",
              "| Log | Start | Moves (robot = Black) | Robot captures | Stops |", "|---|---|---|---|---|"]
     for g in games:
         mv = " ".join(f"{s}{'*' if w == 'robot' else ''}" for s, w in g["moves"]) or "-"
@@ -88,7 +93,7 @@ def main():
                      f"{'; '.join(g['stops']) or '-'} |")
     lines += ["", "`*` = move made by the robot.", "", "| Measure | Value |", "|---|---|"]
     lines += [f"| {k} | {v} |" for k, v in tot.items()]
-    lines += [f"| grips logged (grips.csv, 2026-11-20) | {gs['grips']} |",
+    lines += [f"| grips logged (grips.csv, {', '.join(GAME_DAYS)}) | {gs['grips']} |",
               f"| first-try picks confirmed (square seen empty) | {gs['first_ok']} / {gs['first_tries']} |",
               f"| rank-8 first-try picks confirmed | {gs['rank8_first_ok']} / {gs['rank8_first']} |",
               f"| scans.csv entries by kind (all sessions) | {json.dumps(sc)} |"]

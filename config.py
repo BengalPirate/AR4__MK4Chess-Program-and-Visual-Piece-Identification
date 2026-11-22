@@ -98,6 +98,9 @@ PLACE_TOL_MM = 6.0                  # 2026-11-20 operator: 4 -> 6 (4 mm ~ offset
 PLACE_FIX_TRIES = 2
 PLACE_ASIDE_SQ = 1.5          # step this many squares aside (toward the robot; ranks 7-8: toward rank 1) to look
 GRIP_RETRY_MM = 5.0
+# Offset readings below the 15-mm rule but at least this large: aim at the measured
+# offset itself (2026-11-22). 0 = off.
+OFFSET_AIM_MIN_MM = 4.0
 GRIP_RETRIES = 2
 GRIP_RETRY_FIRST = +1
 # Rank 8 (tilted picks): after two misses the THIRD try aims this far TOWARD THE ROBOT

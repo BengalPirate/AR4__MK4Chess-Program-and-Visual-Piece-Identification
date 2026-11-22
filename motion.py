@@ -336,8 +336,30 @@ class Executor:
                 seen = self.pick_check(chess.parse_square(op.where))
                 self.log(f"    {op.where} seen from aside: {seen or 'undecided'}")
                 if seen is None:
-                    raise MotionError(f"Cannot confirm the pick from {op.where} (still undecided from aside) - "
-                                      "arm stopped, gripper closed: check the jaws and the square")
+                    # operator 2026-11-22 (capture of the h4 pawn stopped here): do not stop -
+                    # the piece may or may not be in the jaws, so set it back down on its square
+                    # (harmless if the jaws are empty) and retry, aimed where the cameras see it
+                    if attempt + 1 >= tries:
+                        raise MotionError(f"Cannot confirm the pick from {op.where} (still undecided from "
+                                          f"aside after {tries} tries) - arm stopped, gripper closed: "
+                                          "check the jaws and the square")
+                    if diffs.get("current_rise"):
+                        self.log("    still undecided, contact was felt - setting the piece back down, then retrying")
+                        held = True
+                    else:
+                        # no contact felt: most likely a miss, the piece still standing - open
+                        # just above where its top would be (a held piece drops only a little,
+                        # onto its own square), then retry
+                        self.log("    still undecided, no contact felt - opening just above the piece's "
+                                 "top over its square, then retrying")
+                        self._approach((x, y, zb + t_full))
+                        z_top = zb + config.PIECE_HEIGHT[piece] + 5.0
+                        self._vertical(x, y, zb + t_full, z_top)
+                        self.grip.open(config.GRIP_OPEN_PIECE[piece])
+                        self._vertical(x, y, z_top, zb + t_full)
+                        self.carry_tilt = 0.0
+                        x, y = self._next_aim(op, bx, by, x0, y0, fallback[min(attempt, 1)], along, up)
+                        continue
             # ONLY the square seen empty confirms a pick
             if seen == "empty" and held is not False:
                 return
@@ -447,6 +469,15 @@ class Executor:
             return x0, y0, None
         self.last_offset = r
         sx, sy = r["shift_x_mm"], r["shift_y_mm"]
+        # 2026-11-22: below the 15-mm rule's threshold, aim at the measured offset itself
+        # once it is at least OFFSET_AIM_MIN_MM (h4 pawn read 6.8 mm off -> picked at the
+        # centre and missed)
+        m = float(getattr(config, "OFFSET_AIM_MIN_MM", 0.0) or 0.0)
+        if m > 0:
+            if not sx and abs(r["dx_mm"]) >= m:
+                sx = r["dx_mm"]
+            if not sy and abs(r["dy_mm"]) >= m:
+                sy = r["dy_mm"]
         self.log(f"    cameras: piece {r['dx_mm']:+.1f} mm toward h, {r['dy_mm']:+.1f} mm toward rank 8"
                  + ("" if not (sx or sy) else f" -> pick shifted {sx:+.0f} mm toward h, {sy:+.0f} mm toward rank 8"))
         if not (sx or sy):
