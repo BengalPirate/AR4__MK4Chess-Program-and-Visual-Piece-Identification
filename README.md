@@ -50,8 +50,9 @@ webcam ─► board_vision.py ─► pieces.py ─────────► ch
    weights, all layers fine-tuned) outputs 13 probabilities per square:
    empty, P N B R Q K, p n b r q k. Training data: 1,592 iPhone photos of our
    own pieces (`photo_dataset.py` decodes the HEIC files, OWL-ViT finds the
-   piece box, crops are made to look like webcam crops) plus 30 labelled webcam
-   boards. Photos are split by runs of 10 consecutive shots so near-identical
+   piece box, crops are made to look like webcam crops) plus labelled webcam
+   boards from both cameras (172 in the current model, retrained 2026-11-20 after the
+   front camera moved to the diagonal view). Photos are split by runs of 10 consecutive shots so near-identical
    pictures never sit on both sides of the split.
 3. **Pieces → game** (`chess_logic.py`). The game state lives in
    python-chess, not in the image. After a move, 5 frames are averaged and every
@@ -124,7 +125,8 @@ the crops the classifier was trained on. The decoder occasionally reports a
   move stays within 3 mm of the straight line it stands for.
 - Vertical approach and retreat only, at a travel height that clears the
   tallest piece plus the part of the carried piece hanging below the jaws.
-- 10 % speed for all testing.
+- 10 % speed for all testing; 30 % at the piece and 50 % for travel in the final games
+  (hard cap 75 % in `ar4link.py`).
 - One-arm interlock (`motion.BoardLock`, a lock file that can sit on a shared
   filesystem): only the arm holding it may move over the board.
 - Uncertain recognition, a board that does not match the game state, or an
@@ -204,10 +206,14 @@ piece type, after changing the gripper pads), `camera_realign.py`.
 | `motion.py` | Executes ops as checked joint moves; interlock; preflight |
 | `kin.py` | Annin kinematics wrapper; gripper-down and tilted inverse kinematics; limits |
 | `ar4link.py`, `gripper.py` | Serial links to the Teensy (firmware 6.7.1) and the gripper Nano |
-| `calibrate_camera.py`, `robot_setup.py`, `manual_calib.py` | Calibration tools |
+| `calibrate_camera.py`, `robot_setup.py`, `manual_calib.py`, `rod_calib.py` | Calibration tools |
+| `camera_realign.py` | Re-align a nudged camera with the pieces on the board |
+| `grip_measure.py` | Where the jaws meet each piece type (after changing the gripper pads) |
 | `config.py`, `config/` | All settings and our calibration files |
 | `models/` | Trained classifier (`piece_cnn.pt`) |
-| `data/`, `data_webcam_test/` | Labelled webcam boards for training / held-out testing |
+| `data/`, `data_webcam_test/`, `data_webcam_test_diag/` | Labelled webcam boards for training / held-out testing (old and diagonal camera views) |
+| `results/games/` | Raw logs of the live games and their summary (`docs/game_stats.py`) |
+| `docs/` | Final and Checkpoint 2 reports and the scripts that build them |
 | `data_photos/boxes.json` | Piece boxes for the phone photos |
 | `results/` | Accuracy reports, confusion matrices, test log, screenshots |
 | `tests/` | Unit tests and the webcam evaluation |
