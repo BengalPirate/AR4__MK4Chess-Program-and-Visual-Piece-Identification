@@ -2,7 +2,8 @@
 
 This file records the exact state the system was left in, so that someone who
 clones this repository on another computer (or another Claude session) can start
-a game **without recalibrating anything**. Tag of this state: see the commit
+a game after redoing only the joint calibration (Annin HMI + J5 by eye):
+board positions, cameras and everything else are used as they are. Tag of this state: see the commit
 "Hand-off snapshot 2026-11-23" (git tag `handoff-20261123`).
 
 ## State when it was handed over
@@ -17,20 +18,14 @@ a game **without recalibrating anything**. Tag of this state: see the commit
 | Board | **standard starting position set up**, tray empty. Human plays White, robot plays Black |
 | Classifier | `models/piece_cnn.pt` (ResNet-18, trained 2026-11-20 22:19) - in the repository |
 
-## Moving the arm to another computer - IMPORTANT
+## On the new computer: only the joint calibration is redone
 
-The Teensy is powered over USB. **Unplugging it restarts it, and on the new
-computer it reports every joint as 0.** The arm does not move by itself, so the
-calibration is still physically valid **as long as nobody moves the arm** (do not
-push it, do not jog it, do not run the HMI calibration or any motion script).
-`restore_park.py` tells the controller it is at PARK again; nothing moves.
+Everything else (board positions, camera calibrations, classifier, settings) is in
+this repository and is used as it is. Unplugging the arm restarts its controller
+(it is powered over USB) and it then reads every joint as 0; the joint calibration
+below takes care of that.
 
-Motor power can stay on during the swap (the drivers hold the joints). If motor
-power is cut, J2/J3 may sag under gravity: then recalibrate (below) instead.
-
-## On the new computer, in this order
-
-1. **Software** (once): Ubuntu/Linux with Python 3.12.
+1. **Software** (once): Linux with Python 3.12.
    ```
    git clone https://github.com/BengalPirate/AR4__MK4Chess-Program-and-Visual-Piece-Identification.git
    cd AR4__MK4Chess-Program-and-Visual-Piece-Identification
@@ -38,45 +33,47 @@ power is cut, J2/J3 may sag under gravity: then recalibrate (below) instead.
    sudo apt install stockfish            # or put the binary on PATH (else a small built-in engine plays)
    sudo usermod -aG dialout $USER        # serial ports; log out and in again
    ```
-   Annin's kinematics module is required (`kin.py`): get the **AR4 HMI 6.7 source**
-   from Annin Robotics, build `ARrobots/robot_kinematics` for this Python (cmake +
-   pybind11, see README "Setup"), and set `export AR4_HMI_DIR=/path/to/"AR4 HMI Interface 6.7 source"`.
-2. **Plug in** the Teensy (arm), the gripper Nano and both webcams. Ports are found
-   automatically (Teensy by its serial number via `/dev/serial/by-id`, Nano by its
-   CH340 chip, cameras by name). Do not start the Annin HMI.
-3. **Restore the park angles** (nothing moves):
-   ```
-   venv/bin/python restore_park.py --check     # expect: "Controller was reset (all joints 0)"
-   venv/bin/python restore_park.py             # expect: "Restored: ... J1=-4.42 J2=6.71 J3=50.21 J4=0.00 J5=33.10 J6=40.59"
-   ```
-   It refuses if the controller reads anything other than all-0 or PARK.
-4. **Check with one hover** at 10 % (hand on the E-stop): the jaws must stop
-   centred about 6 cm above e4. If they are off, stop and recalibrate.
-   ```
-   venv/bin/python hover_test.py e4 --above 40
-   ```
-5. **Cameras**: if they were moved with the computer, check the alignment:
-   `venv/bin/python camera_realign.py front --dry-run` (and `side`). Small nudge:
-   `camera_realign.py front` fixes it with the pieces on. Big move: empty the
-   board and run `calibrate_camera.py`.
-6. **Play** (human White, robot Black, start position on the board):
+   Annin's **AR4 HMI 6.7 source** is needed twice: its app `AR4.py` (step 3) and its
+   kinematics module, which `kin.py` uses: build `ARrobots/robot_kinematics` for this
+   Python (cmake + pybind11, see README "Setup") and
+   `export AR4_HMI_DIR=/path/to/"AR4 HMI Interface 6.7 source"`.
+2. **Plug in** the arm (Teensy), the gripper Nano and both webcams. Ports and cameras
+   are found automatically (Teensy by serial number, Nano by its CH340 chip, cameras by
+   name). The cameras stay where they are on the table.
+3. **Joint calibration in the Annin HMI** (`AR4.py` in the HMI source; in its
+   `ARconfig.json` set `"comPort"` to the Teensy's `/dev/ttyACMx`): Calibration tab,
+   auto-calibrate **J1, J2, J3, J4, J6 only - never J5** (its limit switch is where the
+   gripper folds into the forearm). Hand on the E-stop. Close the HMI.
+4. **J5 by eye**: `venv/bin/python manual_calib.py` - jog J5 until the gripper is in line
+   with the forearm, press **J5 "= 0"** (not "all joints"), Save (keeps the J5 range).
+   Close it.
+5. **Park**: `venv/bin/python go_park.py` - checks the arm reads the calibrated zero pose,
+   simulates the path, moves to PARK at 10 %.
+6. **Check everything** (nothing moves): `venv/bin/python preflight_check.py` - must end
+   with `READY TO PLAY`. It says what to do for any item marked FIX (e.g. a nudged camera:
+   `camera_realign.py front`, works with the pieces on the board).
+7. Optional, recommended: one hover at 10 % - `venv/bin/python hover_test.py e4 --above 40`;
+   the jaws stop centred about 6 cm above e4.
+8. **Play** (human White, robot Black, start position on the board):
    ```
    venv/bin/python -u chess_demo.py --robot --auto --from-board --robot-color black
    ```
-   Add `--fix d1=Q,g1=N` if a start square is read "unsure" (d1/g1/d8/h8 often
-   are). Speeds: 30 % at the piece, 50 % travel (`config.py`). During a stop do not
-   press keys in the game window except TAB (L / I / T save training frames or retrain).
+   Add `--fix d1=Q,g1=N` if a start square is read "unsure" (d1/g1/d8/h8 often are).
+   Speeds: 30 % at the piece, 50 % travel (`config.py`). During a stop do not press keys
+   in the game window except TAB (L / I / T save training frames or retrain).
 
-## If the arm was moved: full recalibration (about 5 minutes)
+Shortcut instead of steps 3-4 (only if the arm has certainly not moved since it was
+parked here): `venv/bin/python restore_park.py` tells the restarted controller it is at
+PARK (nothing moves), then continue at step 6.
 
-1. Annin HMI (`AR4.py` in the HMI source, set `comPort` in `ARconfig.json` to the
-   Teensy's `/dev/ttyACMx`): Calibration tab, auto-calibrate **J1, J2, J3, J4, J6
-   only - never J5** (its switch is where the gripper folds into the forearm). Close the HMI.
-2. `python manual_calib.py`: jog J5 until the gripper is in line with the forearm,
-   press **J5 "= 0"** (not "all joints"), Save (keeps the J5 range).
-3. The board positions in `config/board_robot.json` stay valid. Verify with hovers
-   (`hover_test.py a1 h1 h8 a8 --above 40`); if off, re-teach in `robot_setup.py`
-   (press "20 mm above X", then **jog down until the closed jaw tips touch the board**, then save).
+The joint calibration in steps 3-4 was redone this way on 2026-11-23 05:48 and the
+taught corners were centred afterwards (a1, h1, h8, a8 hover check), so the board
+positions do not depend on the computer or on re-calibrating the joints.
+
+**If the board or the table was moved**: re-teach the corners in `robot_setup.py`
+(press "20 mm above X", then **jog down until the closed jaw tips touch the board**,
+then save; heights must come out about 97 mm), and if the cameras no longer see the
+board in place, empty it and run `calibrate_camera.py`.
 
 ## Rules learned the hard way (read before driving the arm)
 

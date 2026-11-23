@@ -12,8 +12,8 @@ Final report: [`docs/Team2_Final_Report.pdf`](docs/Team2_Final_Report.pdf) – r
 `python docs/game_stats.py && python docs/make_final_report.py`.
 Checkpoint 2 report: [`docs/Team2_Checkpoint2_Report.pdf`](docs/Team2_Checkpoint2_Report.pdf)
 
-**Picking up the parked, calibrated arm on another computer:** see [`HANDOFF.md`](HANDOFF.md)
-(`restore_park.py` restores the park angles after the controller restarts; nothing moves).
+**Picking up the arm on another computer:** see [`HANDOFF.md`](HANDOFF.md) - redo only the joint
+calibration (HMI + J5), then `go_park.py`, `preflight_check.py` (READY TO PLAY) and play.
 
 ## Results at a glance
 
