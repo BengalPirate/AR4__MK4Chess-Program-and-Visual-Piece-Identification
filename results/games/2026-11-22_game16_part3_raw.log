@@ -1,0 +1,227 @@
+camera front: /dev/video8
+camera side: /dev/video6
+Classifier: {'boards': 0, 'kind': 'fine-tuned ResNet-18', 'trained': '2026-11-20 22:19', 'photos': 1079, 'boards_used': 172}
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: premature end of data segment
+Robot connected: X=220.67 Y=-17.06 Z=245.15 Rz=-43.13 Ry=-104.11 Rx=0.02 | J1=-4.42 J2=6.71 J3=50.21 J4=0.00 J5=33.10 J6=40.59
+Warning: Ignoring XDG_SESSION_TYPE=wayland on Gnome. Use QT_QPA_PLATFORM=wayland to run on Wayland anyway.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+Corrupt JPEG data: 55 extraneous bytes before marker 0xd9
+Start position read - checking once more
+Game set from the board: rn2k1nr/pp1b1ppp/4p3/2bp4/5P1q/3BP1P1/PPP4P/RNBQK1NR - Black to move (robot)
+
+Engine (Stockfish skill 20) selects Qe7 = h4e7
+    PICK   q @ h4       (X 419.7 Y 113.7 board Z 97.9)
+    PLACE  q @ e7       (X 260.7 Y -13.8 board Z 97.1)
+Engine: Qe7 (h4 -> e7). X = execute
+Robot executing Qe7 (h4e7) ... (SPACE-bar does not stop the arm: use the E-stop)
+  pick q at h4
+    cameras: piece -1.4 mm toward h, -4.0 mm toward rank 8
+Corrupt JPEG data: premature end of data segment
+    grip at Z 155 (board 98): felt [(45, 0.03), (43, 0.07), (41, 0.02), (39, 0.02), (37, 0.05), (35, 0.11), (33, 0.19), (31, 0.28), (29, 0.24), (27, 0.14), (25, 0.12), (23, 0.12), (21, 0.1), (20, 0.1)]
+    camera check: jaws undecided {'front': 3.0, 'current_rise': 0}; h4 looks occupied
+    missed: the piece is still on the square - opening in the air (no descent)
+    cameras: the piece is now -4.0 mm toward h, -4.1 mm toward rank 8 - aiming there
+    RETRY 1
+    grip at Z 155 (board 98): felt [(45, 0.06), (43, 0.02), (41, 0.03), (39, 0.03), (37, 0.15), (35, 0.42), (33, 0.55), (31, 0.97)]
+    camera check: jaws HOLD a piece {'front': 28.5, 'current_rise': 1}; h4 looks empty
+  place q at e7
+Corrupt JPEG data: 110 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 27 extraneous bytes before marker 0xd9
+    placement check e7: +0.8 mm toward h, -5.4 mm toward rank 8 - OK
+Qe7 played (robot). White to move
+Robot played h4e7. Checking the board...
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 23 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 29 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 28 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: premature end of data segment
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 29 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 20 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 25 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 91 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 61 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 59 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 27 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Seen h4 (h2h4) - checking once more (hands clear)
+Corrupt JPEG data: 54 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 62 extraneous bytes before marker 0xd9
+h4 played (vision). Black to move
+
+Engine (Stockfish skill 20) selects e5 = e6e5
+    PICK   p @ e6       (X 309.3 Y -19.8 board Z 97.2)
+    PLACE  p @ e5       (X 359.8 Y -23.8 board Z 97.4)
+Engine: e5 (e6 -> e5). X = execute
+Robot executing e5 (e6e5) ... (SPACE-bar does not stop the arm: use the E-stop)
+  pick p at e6
+    cameras: piece +3.1 mm toward h, +3.8 mm toward rank 8
+Corrupt JPEG data: 93 extraneous bytes before marker 0xd9
+    grip at Z 120 (board 97): felt [(43, 0.03), (41, 0.01), (39, 0.01), (37, 0.12), (35, 0.12), (33, 0.3), (31, 0.45), (29, 0.25), (27, 0.58), (25, 1.27)]
+    camera check: jaws HOLD a piece {'front': 55.2, 'side': 23.1, 'current_rise': 1}; e6 looks empty
+  place p at e5
+Corrupt JPEG data: premature end of data segment
+    placement check e5: -4.0 mm toward h, -1.7 mm toward rank 8 - OK
+Corrupt JPEG data: premature end of data segment
+e5 played (robot). White to move
+Robot played e6e5. Checking the board...
+Corrupt JPEG data: 54 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 58 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 62 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 29 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 54 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 62 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Seen Rh2 (h1h2) - checking once more (hands clear)
+Corrupt JPEG data: 20 extraneous bytes before marker 0xd9
+Rh2 played (vision). Black to move
+
+Engine (Stockfish skill 20) selects Nf6 = g8f6
+    PICK   n @ g8       (X 214.2 Y 73.4 board Z 101.3)
+    PLACE  n @ f6       (X 313.2 Y 25.9 board Z 97.4)
+Engine: Nf6 (g8 -> f6). X = execute
+Robot executing Nf6 (g8f6) ... (SPACE-bar does not stop the arm: use the E-stop)
+  pick n at g8
+    cameras: piece -1.3 mm toward h, -5.1 mm toward rank 8 -> pick shifted -0 mm toward h, -5 mm toward rank 8
+    grip at Z 136 (board 101): felt [(43, 0.07), (41, 0.01), (39, 0.04), (37, 0.04), (35, 0.09), (33, 0.07), (31, 0.2), (29, 0.25), (27, 0.14), (25, 0.12), (23, 0.35), (21, 0.55), (19, 1.3)]
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: 23 extraneous bytes before marker 0xd9
+    camera check: jaws HOLD a piece {'front': 22.6, 'side': 13.3, 'current_rise': 1}; g8 looks empty
+  place n at f6
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: 95 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 28 extraneous bytes before marker 0xd9
+    placement check f6: +1.9 mm toward h, +3.0 mm toward rank 8 - OK
+Nf6 played (robot). White to move
+Robot played g8f6. Checking the board...
+Corrupt JPEG data: 26 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: 30 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 25 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 60 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 92 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 134 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 20 extraneous bytes before marker 0xd9
+Seen fxe5 (f4e5) - checking once more (hands clear)
+Corrupt JPEG data: 27 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 21 extraneous bytes before marker 0xd9
+fxe5 played (vision). Black to move TRAY: put the p in tray slot 2.
+
+Engine (Stockfish skill 20) selects Qxe5 = e7e5
+    PICK   P @ e5       (X 359.8 Y -23.8 board Z 97.4)  - capture
+    PLACE  P @ tray:3   (X 380.2 Y 234.6 board Z 63.1)  - to captured tray
+    PICK   q @ e7       (X 260.7 Y -13.8 board Z 97.1)
+    PLACE  q @ e5       (X 359.8 Y -23.8 board Z 97.4)
+Engine: Qxe5 (e7 -> e5). X = execute
+Robot executing Qxe5 (e7e5) ... (SPACE-bar does not stop the arm: use the E-stop)
+  pick P at e5
+    cameras: piece -4.0 mm toward h, -1.9 mm toward rank 8 -> pick shifted -4 mm toward h, -0 mm toward rank 8
+    grip at Z 120 (board 97): felt [(43, 0.05), (41, 0.04), (39, 0.01), (37, 0.03), (35, 0.11), (33, 0.12), (31, 0.14), (29, 0.17), (27, 0.46), (25, 0.96)]
+    camera check: jaws HOLD a piece {'front': 38.6, 'current_rise': 1}; e5 looks empty
+  place P at tray:3
+Corrupt JPEG data: 130 extraneous bytes before marker 0xd9
+  pick q at e7
+    cameras: piece +3.3 mm toward h, -0.1 mm toward rank 8
+Corrupt JPEG data: premature end of data segment
+    grip at Z 154 (board 97): felt [(45, 0.07), (43, 0.03), (41, 0.02), (39, 0.04), (37, 0.21), (35, 0.47), (33, 0.76), (31, 1.17)]
+    camera check: jaws HOLD a piece {'front': 48.3, 'side': 10.1, 'current_rise': 1}; e7 looks empty
+  place q at e5
+    placement check e5: -4.7 mm toward h, +1.1 mm toward rank 8 - OK
+Qxe5 played (robot). White to move
+Robot played e7e5. Checking the board...
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (1 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 26 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 57 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 20 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 24 extraneous bytes before marker 0xd9
+Seen Rf2 (h2f2) - checking once more (hands clear)
+Corrupt JPEG data: 61 extraneous bytes before marker 0xd9
+Rf2 played (vision). Black to move
+
+Engine (Stockfish skill 20) selects Qxg3 = e5g3
+    PICK   P @ g3       (X 464.3 Y 63.9 board Z 97.8)  - capture
+    PLACE  P @ tray:4   (X 332.5 Y 239.7 board Z 63.1)  - to captured tray
+    PICK   q @ e5       (X 359.8 Y -23.8 board Z 97.4)
+    PLACE  q @ g3       (X 464.3 Y 63.9 board Z 97.8)
+Engine: Qxg3 (e5 -> g3). X = execute
+Robot executing Qxg3 (e5g3) ... (SPACE-bar does not stop the arm: use the E-stop)
+  pick P at g3
+    cameras: piece +0.1 mm toward h, +2.5 mm toward rank 8
+    grip at Z 121 (board 98): felt [(43, 0.01), (41, 0.02), (39, 0.05), (37, 0.13), (35, 0.12), (33, 0.39), (31, 0.51), (29, 0.28), (27, 0.21), (25, 0.17), (23, 0.23), (21, 0.2), (20, 0.22)]
+    camera check: jaws undecided {'front': 29.4, 'current_rise': 0}; g3 looks occupied
+    missed: the piece is still on the square - opening in the air (no descent)
+    cameras: the piece is now +4.5 mm toward h, +6.1 mm toward rank 8 - aiming there
+    RETRY 1
+    grip at Z 121 (board 98): felt [(43, 0.06), (41, 0.03), (39, 0.04), (37, 0.02), (35, 0.1), (33, 0.07), (31, 0.34), (29, 0.21), (27, 0.22), (25, 0.23), (23, 0.75), (21, 1.28)]
+    camera check: jaws HOLD a piece {'front': 5.4, 'current_rise': 1}; g3 looks empty
+  place P at tray:4
+  pick q at e5
+    cameras: piece -4.2 mm toward h, -4.8 mm toward rank 8 -> pick shifted -4 mm toward h, -5 mm toward rank 8
+Corrupt JPEG data: premature end of data segment
+    grip at Z 154 (board 97): felt [(45, 0.06), (43, 0.04), (41, 0.01), (39, 0.04), (37, 0.21), (35, 0.49), (33, 0.79), (31, 1.32)]
+    camera check: jaws HOLD a piece {'front': 6.3, 'current_rise': 1}; e5 looks empty
+  place q at g3
+Corrupt JPEG data: 95 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 25 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: 19 extraneous bytes before marker 0xd9
+  motion stopped - arm left in place, interlock still held
+ROBOT STOPPED: The piece is NOT on g3 after the set-down (the jaws were probably empty) - check the gripper and the board - AUTO PAUSED: fix the board, then TAB
+Corrupt JPEG data: 22 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 55 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 23 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 95 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 25 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: 26 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 19 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 27 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: 25 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: 24 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 134 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: 28 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: premature end of data segment
+Corrupt JPEG data: premature end of data segment

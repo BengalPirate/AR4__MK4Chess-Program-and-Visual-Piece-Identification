@@ -9,7 +9,7 @@
 
 Close robot_setup.py / the HMI first (one program per arm port). Every move uses
 the same code as a real game (ik_down: straight down, or tilted on b8-g8), at
-config.SPEED_PCT. The script stops at each square and waits for Enter; Ctrl+C or
+--speed percent (default 10). The script stops at each square and waits for Enter; Ctrl+C or
 the E-stop to abort. Ends at PARK.
 """
 import argparse
@@ -47,7 +47,9 @@ def main():
                     help="pointed tool in the jaws, sticking out this many mm below the jaw tips: "
                          "the POINT is brought to --above mm over the square centre (default and minimum 10)")
     ap.add_argument("--pause", type=float, default=6.0, help="seconds to pause per square when not run from a terminal")
+    ap.add_argument("--speed", type=int, default=10, help="percent speed for every move (default 10 - a check, not a game)")
     a = ap.parse_args()
+    config.SPEED_PCT = config.TRAVEL_SPEED_PCT = a.speed
     if a.pointer:
         # Planning heights are FLANGE heights (straight down), with "jaw tips touching"
         # as the reference: the pointer's length must be ADDED to every height, not

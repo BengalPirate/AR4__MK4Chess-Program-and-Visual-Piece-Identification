@@ -1,0 +1,67 @@
+camera front: /dev/video8
+camera side: /dev/video6
+Classifier: {'boards': 0, 'kind': 'fine-tuned ResNet-18', 'trained': '2026-11-20 22:19', 'photos': 1079, 'boards_used': 172}
+Robot connected: X=220.67 Y=-17.06 Z=245.15 Rz=-43.13 Ry=-104.11 Rx=0.02 | J1=-4.42 J2=6.71 J3=50.21 J4=0.00 J5=33.10 J6=40.59
+Warning: Ignoring XDG_SESSION_TYPE=wayland on Gnome. Use QT_QPA_PLATFORM=wayland to run on Wayland anyway.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/parallels/AR4/venv/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+Start position read - checking once more
+Corrupt JPEG data: 20 extraneous bytes before marker 0xd9
+Game set from the board: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR - White to move (YOU)
+Corrupt JPEG data: 27 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 86 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 24 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: 20 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 27 extraneous bytes before marker 0xd9
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Corrupt JPEG data: premature end of data segment
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Board matches the game (0 square(s) misread but explained by the game state). White to move - YOUR move
+Seen h4 (h2h4) - checking once more (hands clear)
+h4 played (vision). Black to move
+
+Engine (Stockfish skill 20) selects e5 = e7e5
+    PICK   p @ e7       (X 261.1 Y -0.3 board Z 97.1)
+    PLACE  p @ e5       (X 360.8 Y -12.0 board Z 97.4)
+Engine: e5 (e7 -> e5). X = execute
+Robot executing e5 (e7e5) ... (SPACE-bar does not stop the arm: use the E-stop)
+  pick p at e7
+    cameras: piece +2.8 mm toward h, +2.7 mm toward rank 8
+    grip at Z 120 (board 97): felt [(43, 0.55), (41, 0.5), (39, 0.5), (37, 0.48), (35, 0.44), (33, 0.43), (31, 0.3), (29, 0.33), (27, 0.38), (25, 0.35), (23, 0.36), (21, 0.4), (20, 0.43)]
+    camera check: jaws HOLD a piece {'front': 2.7, 'side': 22.0, 'current_rise': 0}; e7 looks occupied
+    square occupied but the jaws show a piece - setting it back down first
+    cameras: the piece is now +1.7 mm toward h, +6.3 mm toward rank 8 - aiming there
+    RETRY 1
+Corrupt JPEG data: 50 extraneous bytes before marker 0xd9
+    grip at Z 120 (board 97): felt [(43, 0.54), (41, 0.49), (39, 0.51), (37, 0.44), (35, 0.42), (33, 0.48), (31, 0.26), (29, 0.32), (27, 0.39), (25, 0.35), (23, 0.34), (21, 0.42), (20, 0.45)]
+    camera check: jaws HOLD a piece {'front': 2.4, 'side': 18.6, 'current_rise': 1}; e7 looks occupied
+    square occupied but the jaws show a piece - setting it back down first
+Corrupt JPEG data: 49 extraneous bytes before marker 0xd9
+Corrupt JPEG data: 161 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+    cameras: the piece is now +1.8 mm toward h, +10.3 mm toward rank 8 - aiming there
+    RETRY 2
+Corrupt JPEG data: 26 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+    grip at Z 120 (board 97): felt [(43, 0.56), (41, 0.51), (39, 0.51), (37, 0.45), (35, 0.46), (33, 0.43), (31, 0.38), (29, 0.37), (27, 0.35), (25, 0.39), (23, 0.39), (21, 0.4), (20, 0.55)]
+Corrupt JPEG data: 27 extraneous bytes before marker 0xd9
+Corrupt JPEG data: premature end of data segment
+    camera check: jaws HOLD a piece {'front': 3.6, 'side': 13.1, 'current_rise': 1}; e7 looks empty
+  place p at e5
+Corrupt JPEG data: 26 extraneous bytes before marker 0xd9
+  motion stopped - arm left in place, interlock still held
+ROBOT STOPPED: The piece is NOT on e5 after the set-down (the jaws were probably empty) - check the gripper and the board - AUTO PAUSED: fix the board, then TAB

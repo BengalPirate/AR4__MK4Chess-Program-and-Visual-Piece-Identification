@@ -18,6 +18,7 @@ Setup notes (learned 2026-11-14):
   constructor retries.
 """
 import glob
+import os
 import time
 
 import serial
@@ -30,7 +31,10 @@ STALL_AMPS = 0.8
 OPEN_STALL_AMPS = 1.5            # opening only (see open())
 OPEN_GRACE_S = 0.5
 STALL_GRACE_S = 0.3              # ignore this long after each step: the servo's start burst is not a stall
-IDLE_MAX_AMPS = 0.45    # an open, free gripper reads 0.1-0.3 A; a bound one 0.4-0.6
+# an open, free gripper reads 0.1-0.3 A; a bound one 0.4-0.6. 2026-11-23: after the J5
+# fold the gripper read 0.15-0.54 A open and the operator found nothing wrong ->
+# 0.6 for now (env AR4_GRIP_IDLE_MAX_AMPS overrides; 0.45 is the original value)
+IDLE_MAX_AMPS = float(os.environ.get("AR4_GRIP_IDLE_MAX_AMPS", 0.6))
 # USB IDs of common Nano boards: CH340 clone, FTDI, genuine Arduino
 NANO_IDS = {(0x1A86, 0x7523), (0x0403, 0x6001), (0x2341, 0x0043), (0x2341, 0x0058),
             (0x2341, 0x0001)}

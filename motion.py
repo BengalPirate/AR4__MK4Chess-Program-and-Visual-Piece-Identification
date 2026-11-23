@@ -538,6 +538,41 @@ class Executor:
             self.log(f"    placement check failed ({e})")
             return None
 
+    def _recheck_set_down(self, op, looks=2):
+        """The destination read EMPTY right after a set-down. Two causes seen on
+        2026-11-22 (h4, g3) besides a real drop: the foam pads held the piece a moment
+        too long, or one camera read the square badly. Look again; if still empty, go
+        back down over the square, open the jaws wider (releases a piece stuck in the
+        foam; around a piece that is there it is just a pick approach), rise, look again.
+        True = the piece is now seen there."""
+        sq = chess.parse_square(op.where)
+
+        def seen():
+            for _ in range(looks):
+                time.sleep(1.0)
+                s = self.pick_check(sq)
+                if s != "empty":
+                    self.log(f"    {op.where} looked empty, now {s or 'undecided'} - continuing")
+                    return True
+            return False
+
+        if seen():
+            return True
+        piece = op.piece.upper()
+        self.log(f"    {op.where} still looks empty - the piece may be stuck in the foam: "
+                 "going back down to release it")
+        self.travel(piece)
+        self.min_tilt = getattr(self, "last_place_tilt", self.tilt_for(op.where))
+        x, y, zb = self._target(op, self.min_tilt)
+        t_full = config.travel_z(piece)
+        self._approach((x, y, zb + t_full))
+        z_rel = zb + config.GRASP_Z[piece] + config.PLACE_EXTRA_Z
+        self._vertical(x, y, zb + t_full, z_rel)
+        self.grip.open(min(config.GRIP_OPEN_PIECE[piece] + 3, 50))
+        self._vertical(x, y, z_rel, zb + config.travel_z())
+        self._step_aside(op.where)
+        return seen()
+
     def _check_placement(self, op):
         tol = config.PLACE_TOL_MM
         fix_h = fix_8 = 0.0                 # total counter-shift of the set-down so far
@@ -546,8 +581,10 @@ class Executor:
             if self.pick_check is not None:
                 there = self.pick_check(chess.parse_square(op.where))
                 if there == "empty":
-                    raise MotionError(f"The piece is NOT on {op.where} after the set-down (the jaws were "
-                                      "probably empty) - check the gripper and the board")
+                    if not self._recheck_set_down(op):
+                        raise MotionError(f"The piece is NOT on {op.where} after the set-down (the jaws were "
+                                          "probably empty) - check the gripper and the board")
+                    r = self._look(op.where)
             if r is None:
                 self.log(f"    placement check: no reading on {op.where} - left as placed")
                 return

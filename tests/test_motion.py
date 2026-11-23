@@ -159,3 +159,48 @@ def test_undecided_pick_still_stops_after_all_tries(tmp_path):
     with pytest.raises(MotionError, match="undecided"):
         ex.run([br.locate(o) for o in plan_move(g, g.parse_move("e2e4"))], park=False)
     assert [k for k, _ in ex.grip.log].count("hold") == 1 + config.GRIP_RETRIES
+
+
+def _placing_executor(tmp_path, answers, logs, monkeypatch):
+    import motion
+    monkeypatch.setattr(motion.time, "sleep", lambda s: None)
+    br = make_robot(tmp_path)
+    seq = iter(answers)
+    ex = Executor(DryArm(br.park["joints"] if br.park else [0, 30, 0, 0, 60, 0]), DryGripper(), br,
+                  BoardLock(str(tmp_path / "l")), log=logs.append, pick_check=lambda sq: next(seq),
+                  offset_reader=lambda sq: {"dx_mm": 0.0, "dy_mm": 0.0, "shift_x_mm": 0.0, "shift_y_mm": 0.0})
+    return br, ex
+
+
+def test_set_down_seen_empty_is_looked_at_again(tmp_path, monkeypatch):
+    """2026-11-22 (Qh4+, Qxg3): the destination read empty right after the set-down
+    although the piece was there (foam held it a moment / camera misread): look again
+    instead of stopping."""
+    g = Game()
+    logs = []
+    # pick confirmed, then the destination: empty once, then occupied
+    br, ex = _placing_executor(tmp_path, ["empty", "empty", "occupied"], logs, monkeypatch)
+    ex.run([br.locate(o) for o in plan_move(g, g.parse_move("e2e4"))], park=False)
+    assert any("now occupied" in m for m in logs)
+
+
+def test_set_down_still_empty_releases_then_stops(tmp_path, monkeypatch):
+    """Still empty after looking again: back down over the square, jaws opened wider,
+    look again; only then stop."""
+    g = Game()
+    logs = []
+    br, ex = _placing_executor(tmp_path, ["empty"] + ["empty"] * 10, logs, monkeypatch)
+    with pytest.raises(MotionError, match="NOT on e4"):
+        ex.run([br.locate(o) for o in plan_move(g, g.parse_move("e2e4"))], park=False)
+    assert any("stuck in the foam" in m for m in logs)
+    opens = [a for k, a in ex.grip.log if k == "open"]
+    assert max(opens) > config.GRIP_OPEN_PIECE["P"]
+
+
+def test_set_down_released_from_foam_continues(tmp_path, monkeypatch):
+    g = Game()
+    logs = []
+    # pick ok; destination empty, empty, empty (two re-looks); after the release: occupied
+    br, ex = _placing_executor(tmp_path, ["empty", "empty", "empty", "empty", "occupied"], logs, monkeypatch)
+    ex.run([br.locate(o) for o in plan_move(g, g.parse_move("e2e4"))], park=False)
+    assert any("stuck in the foam" in m for m in logs) and any("now occupied" in m for m in logs)
